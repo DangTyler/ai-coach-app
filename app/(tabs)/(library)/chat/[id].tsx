@@ -1,0 +1,533 @@
+import { useLocalSearchParams, Stack } from "expo-router";
+import { Send, SlidersHorizontal, X, ChevronDown } from "lucide-react-native";
+import React, { useState, useRef, useCallback, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+  Animated,
+  Switch,
+  ScrollView,
+  Dimensions,
+  Pressable,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import Colors from "@/constants/colors";
+import { defaultContextCards, ContextCard, Message } from "@/mocks/chats";
+import { coaches } from "@/mocks/coaches";
+
+const { height: screenHeight } = Dimensions.get("window");
+
+export default function ChatScreen() {
+  const { id, initialPrompt } = useLocalSearchParams<{
+    id: string;
+    initialPrompt?: string;
+  }>();
+  const insets = useSafeAreaInsets();
+
+  const coach = coaches.find((c) => c.id === id);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [showContext, setShowContext] = useState(false);
+  const [contextCards, setContextCards] = useState<ContextCard[]>(defaultContextCards);
+  const slideAnim = useRef(new Animated.Value(screenHeight)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
+  const flatListRef = useRef<FlatList>(null);
+
+  const openSheet = useCallback(() => {
+    setShowContext(true);
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 25,
+        stiffness: 200,
+      }),
+      Animated.timing(overlayAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [slideAnim, overlayAnim]);
+
+  const closeSheet = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: screenHeight,
+        useNativeDriver: true,
+        damping: 25,
+        stiffness: 200,
+      }),
+      Animated.timing(overlayAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setShowContext(false));
+  }, [slideAnim, overlayAnim]);
+
+  const sendMessage = useCallback(
+    (text: string) => {
+      if (!text.trim() || !coach) return;
+
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        content: text.trim(),
+        isUser: true,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setInputText("");
+
+      setTimeout(() => {
+        const responses = [
+          `That's a great question. ${text.includes("?") ? "Let me think about that..." : "I'd love to help you with this."}`,
+          `I understand what you're going through. Here's my perspective...`,
+          `Based on my experience, I'd suggest starting by breaking this down into smaller steps.`,
+          `This is something many of my clients face. The key is to focus on what you can control.`,
+        ];
+        const aiMessage: Message = {
+          id: `ai-${Date.now()}`,
+          content: responses[Math.floor(Math.random() * responses.length)],
+          isUser: false,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      }, 1000);
+    },
+    [coach]
+  );
+
+  useEffect(() => {
+    if (initialPrompt) {
+      sendMessage(initialPrompt);
+    }
+  }, []);
+
+  const toggleCard = useCallback((cardId: string) => {
+    setContextCards((prev) =>
+      prev.map((card) =>
+        card.id === cardId ? { ...card, enabled: !card.enabled } : card
+      )
+    );
+  }, []);
+
+  const updateCardContent = useCallback((cardId: string, content: string) => {
+    setContextCards((prev) =>
+      prev.map((card) => (card.id === cardId ? { ...card, content } : card))
+    );
+  }, []);
+
+  if (!coach) {
+    return (
+      <View style={styles.container}>
+        <Text>Coach not found</Text>
+      </View>
+    );
+  }
+
+  const renderMessage = ({ item }: { item: Message }) => (
+    <View
+      style={[
+        styles.messageContainer,
+        item.isUser ? styles.userMessage : styles.aiMessage,
+      ]}
+    >
+      {!item.isUser && (
+        <Image source={{ uri: coach.avatar }} style={styles.messageAvatar} />
+      )}
+      <View
+        style={[
+          styles.messageBubble,
+          item.isUser ? styles.userBubble : styles.aiBubble,
+        ]}
+      >
+        <Text
+          style={[
+            styles.messageText,
+            item.isUser ? styles.userText : styles.aiText,
+          ]}
+        >
+          {item.content}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const enabledCount = contextCards.filter((c) => c.enabled).length;
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={90}
+    >
+      <Stack.Screen
+        options={{
+          title: coach.name,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={openSheet}
+              style={styles.headerContextButton}
+            >
+              <SlidersHorizontal color={Colors.navy} size={20} />
+              {enabledCount > 0 && (
+                <View style={styles.contextBadge}>
+                  <Text style={styles.contextBadgeText}>{enabledCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ),
+        }}
+      />
+
+      {messages.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Image source={{ uri: coach.avatar }} style={styles.emptyAvatar} />
+          <Text style={styles.emptyTitle}>Chat with {coach.name}</Text>
+          <Text style={styles.emptySubtitle}>
+            Ask me anything about {coach.category.toLowerCase()}
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMessage}
+          contentContainerStyle={styles.messageList}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+        />
+      )}
+
+      <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            placeholder="Type your message..."
+            placeholderTextColor={Colors.textMuted}
+            value={inputText}
+            onChangeText={setInputText}
+            multiline
+            maxLength={500}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              inputText.trim() && { backgroundColor: coach.color },
+            ]}
+            onPress={() => sendMessage(inputText)}
+            disabled={!inputText.trim()}
+            activeOpacity={0.8}
+          >
+            <Send
+              color={inputText.trim() ? Colors.white : Colors.textMuted}
+              size={20}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {showContext && (
+        <View style={StyleSheet.absoluteFill}>
+          <Animated.View
+            style={[
+              styles.overlay,
+              {
+                opacity: overlayAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.5],
+                }),
+              },
+            ]}
+          >
+            <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} />
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.bottomSheet,
+              { transform: [{ translateY: slideAnim }] },
+            ]}
+          >
+            <View style={styles.sheetHeader}>
+              <View style={styles.sheetHandle} />
+              <View style={styles.sheetTitleRow}>
+                <Text style={styles.sheetTitle}>Chat Context</Text>
+                <TouchableOpacity onPress={closeSheet}>
+                  <X color={Colors.textSecondary} size={24} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.sheetSubtitle}>
+                Enable cards to personalize this conversation
+              </Text>
+            </View>
+            <ScrollView
+              style={styles.sheetContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {contextCards.map((card) => (
+                <View key={card.id} style={styles.contextCard}>
+                  <View style={styles.contextCardHeader}>
+                    <Text style={styles.contextCardTitle}>{card.title}</Text>
+                    <Switch
+                      value={card.enabled}
+                      onValueChange={() => toggleCard(card.id)}
+                      trackColor={{
+                        false: Colors.border,
+                        true: coach.color + '60',
+                      }}
+                      thumbColor={card.enabled ? coach.color : Colors.white}
+                    />
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.contextCardInput,
+                      !card.enabled && styles.contextCardInputDisabled,
+                    ]}
+                    value={card.content}
+                    onChangeText={(text) => updateCardContent(card.id, text)}
+                    multiline
+                    editable={card.enabled}
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+              ))}
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </Animated.View>
+        </View>
+      )}
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  headerContextButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  contextBadge: {
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+  },
+  contextBadgeText: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 40,
+  },
+  emptyAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.navy,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 8,
+  },
+  messageList: {
+    padding: 16,
+    paddingBottom: 8,
+  },
+  messageContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+    alignItems: "flex-end",
+  },
+  userMessage: {
+    justifyContent: "flex-end",
+  },
+  aiMessage: {
+    justifyContent: "flex-start",
+  },
+  messageAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  messageBubble: {
+    maxWidth: "75%",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+  },
+  userBubble: {
+    backgroundColor: Colors.navy,
+    borderBottomRightRadius: 6,
+  },
+  aiBubble: {
+    backgroundColor: Colors.white,
+    borderBottomLeftRadius: 6,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  userText: {
+    color: Colors.white,
+  },
+  aiText: {
+    color: Colors.text,
+  },
+  inputContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderLight,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    paddingLeft: 18,
+    paddingRight: 6,
+    paddingVertical: 6,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text,
+    maxHeight: 100,
+    paddingVertical: 10,
+  },
+  sendButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.borderLight,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.navy,
+  },
+  bottomSheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: screenHeight * 0.7,
+    shadowColor: Colors.navy,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  sheetHeader: {
+    paddingTop: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: Colors.border,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  sheetTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: Colors.navy,
+  },
+  sheetSubtitle: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  sheetContent: {
+    padding: 24,
+  },
+  contextCard: {
+    backgroundColor: Colors.cardAlt,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  contextCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  contextCardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.navy,
+  },
+  contextCardInput: {
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    padding: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  contextCardInputDisabled: {
+    backgroundColor: Colors.borderLight,
+    color: Colors.textMuted,
+  },
+});
