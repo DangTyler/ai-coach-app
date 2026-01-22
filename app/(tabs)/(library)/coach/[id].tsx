@@ -31,13 +31,16 @@ export default function CoachDetailScreen() {
   }
 
   const handleStartChat = () => {
-    router.push(`/chat/${coach.id}`);
+    router.push({
+      pathname: '/chat/[id]',
+      params: { id: coach.id },
+    });
   };
 
   const handlePromptPress = (prompt: string) => {
     router.push({
-      pathname: `/chat/${coach.id}`,
-      params: { initialPrompt: prompt },
+      pathname: '/chat/[id]',
+      params: { id: coach.id, initialPrompt: prompt },
     });
   };
 
