@@ -39,7 +39,7 @@ export default function SavedScreen() {
   const router = useRouter();
 
   const handleChatPress = (chat: SavedChat) => {
-    router.push(`/chat/${chat.coachId}`);
+    router.push(`/chat/${chat.coachId}?chatId=${chat.id}`);
   };
 
   const renderChatItem = ({ item }: { item: SavedChat }) => (

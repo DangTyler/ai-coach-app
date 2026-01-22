@@ -20,20 +20,23 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { defaultContextCards, ContextCard, Message } from "@/mocks/chats";
+import { defaultContextCards, ContextCard, Message, savedChats } from "@/mocks/chats";
 import { coaches } from "@/mocks/coaches";
 
 const { height: screenHeight } = Dimensions.get("window");
 
 export default function ChatScreen() {
-  const { id, initialPrompt } = useLocalSearchParams<{
+  const { id, initialPrompt, chatId } = useLocalSearchParams<{
     id: string;
     initialPrompt?: string;
+    chatId?: string;
   }>();
   const insets = useSafeAreaInsets();
 
   const coach = coaches.find((c) => c.id === id);
-  const [messages, setMessages] = useState<Message[]>([]);
+  
+  const savedChat = chatId ? savedChats.find((c) => c.id === chatId) : null;
+  const [messages, setMessages] = useState<Message[]>(savedChat?.messages || []);
   const [inputText, setInputText] = useState("");
   const [showContext, setShowContext] = useState(false);
   const [contextCards, setContextCards] = useState<ContextCard[]>(defaultContextCards);
