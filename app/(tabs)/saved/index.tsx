@@ -12,7 +12,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { savedChats, SavedChat } from "@/mocks/chats";
+import { useChats } from "@/contexts/ChatContext";
+import { SavedChat } from "@/mocks/chats";
 
 function formatTimestamp(date: Date): string {
   const now = new Date();
@@ -37,6 +38,7 @@ function formatTimestamp(date: Date): string {
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { savedChats } = useChats();
 
   const handleChatPress = (chat: SavedChat) => {
     router.push(`/chat/${chat.coachId}?chatId=${chat.id}`);
@@ -78,11 +80,11 @@ export default function SavedScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Saved Chats</Text>
         <Text style={styles.subtitle}>
-          {savedChats.length} conversation{savedChats.length !== 1 ? "s" : ""}
+          {savedChats.filter(c => c.messages.length > 0).length} conversation{savedChats.filter(c => c.messages.length > 0).length !== 1 ? "s" : ""}
         </Text>
       </View>
 
-      {savedChats.length === 0 ? (
+      {savedChats.filter(c => c.messages.length > 0).length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
             <MessageSquare color={Colors.textMuted} size={48} />
@@ -94,7 +96,7 @@ export default function SavedScreen() {
         </View>
       ) : (
         <FlatList
-          data={savedChats}
+          data={savedChats.filter(c => c.messages.length > 0)}
           keyExtractor={(item) => item.id}
           renderItem={renderChatItem}
           contentContainerStyle={styles.listContainer}

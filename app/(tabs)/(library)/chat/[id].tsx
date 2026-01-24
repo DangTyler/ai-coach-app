@@ -20,7 +20,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { defaultContextCards, ContextCard, Message, savedChats } from "@/mocks/chats";
+import { useChats } from "@/contexts/ChatContext";
+import { defaultContextCards, ContextCard, Message } from "@/mocks/chats";
 import { coaches } from "@/mocks/coaches";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -34,9 +35,10 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
 
   const coach = coaches.find((c) => c.id === id);
+  const { getMessages, addMessage, getOrCreateChat } = useChats();
   
-  const savedChat = chatId ? savedChats.find((c) => c.id === chatId) : null;
-  const [messages, setMessages] = useState<Message[]>(savedChat?.messages || []);
+  const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
+  const messages = activeChatId ? getMessages(activeChatId) : [];
   const [inputText, setInputText] = useState("");
   const [showContext, setShowContext] = useState(false);
   const [contextCards, setContextCards] = useState<ContextCard[]>(defaultContextCards);
@@ -81,6 +83,12 @@ export default function ChatScreen() {
     (text: string) => {
       if (!text.trim() || !coach) return;
 
+      let currentChatId = activeChatId;
+      if (!currentChatId) {
+        currentChatId = getOrCreateChat(coach.id, coach.name, coach.avatar);
+        setActiveChatId(currentChatId);
+      }
+
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         content: text.trim(),
@@ -88,9 +96,10 @@ export default function ChatScreen() {
         timestamp: new Date(),
       };
 
-      setMessages((prev) => [...prev, userMessage]);
+      addMessage(currentChatId, userMessage);
       setInputText("");
 
+      const chatIdForResponse = currentChatId;
       setTimeout(() => {
         const responses = [
           `That's a great question. ${text.includes("?") ? "Let me think about that..." : "I'd love to help you with this."}`,
@@ -104,10 +113,10 @@ export default function ChatScreen() {
           isUser: false,
           timestamp: new Date(),
         };
-        setMessages((prev) => [...prev, aiMessage]);
+        addMessage(chatIdForResponse, aiMessage);
       }, 1000);
     },
-    [coach]
+    [coach, activeChatId, getOrCreateChat, addMessage]
   );
 
   useEffect(() => {
