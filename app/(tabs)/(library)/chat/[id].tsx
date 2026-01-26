@@ -46,7 +46,7 @@ export default function ChatScreen() {
 
   const { getCoachById } = useCoaches();
   const coach = getCoachById(id || "");
-  const { getOrCreateChat } = useChats();
+  const { getOrCreateChat, addMessage, getMessages } = useChats();
   
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
   const [inputText, setInputText] = useState("");
@@ -79,6 +79,7 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
   });
 
   const [hasSetContext, setHasSetContext] = useState(false);
+  const [lastSyncedMessageCount, setLastSyncedMessageCount] = useState(0);
 
   const isLoading = status === "streaming" || status === "submitted";
 
@@ -174,6 +175,25 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
       handleSendMessage(initialPrompt);
     }
   }, [initialPrompt, hasUsedInitialPrompt, handleSendMessage]);
+
+  // Sync messages to ChatContext for persistence
+  useEffect(() => {
+    if (!activeChatId || status === "streaming" || status === "submitted") return;
+    
+    const newMessages = displayMessages.slice(lastSyncedMessageCount);
+    if (newMessages.length === 0) return;
+    
+    newMessages.forEach((msg) => {
+      addMessage(activeChatId, {
+        id: msg.id,
+        content: msg.content,
+        isUser: msg.isUser,
+        timestamp: msg.timestamp,
+      });
+    });
+    
+    setLastSyncedMessageCount(displayMessages.length);
+  }, [activeChatId, displayMessages, lastSyncedMessageCount, status, addMessage]);
 
   const toggleCard = useCallback((cardId: string) => {
     setContextCards((prev) =>
