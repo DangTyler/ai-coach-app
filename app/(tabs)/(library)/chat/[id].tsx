@@ -23,8 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
+import { useCoaches } from "@/contexts/CoachContext";
 import { defaultContextCards, ContextCard } from "@/mocks/chats";
-import { coaches } from "@/mocks/coaches";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -44,7 +44,8 @@ export default function ChatScreen() {
   }>();
   const insets = useSafeAreaInsets();
 
-  const coach = coaches.find((c) => c.id === id);
+  const { getCoachById } = useCoaches();
+  const coach = getCoachById(id || "");
   const { getOrCreateChat } = useChats();
   
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
@@ -64,6 +65,10 @@ export default function ChatScreen() {
       ? `\n\nUser Context:\n${enabledCards.map(c => `- ${c.title}: ${c.content}`).join('\n')}`
       : "";
     
+    if (coach.systemPrompt) {
+      return `${coach.systemPrompt}${contextSection}`;
+    }
+    
     return `You are ${coach.name}, ${coach.tagline}. ${coach.promise}
 
 Your expertise is in ${coach.category}. Respond as this coach would - with their unique perspective, tone, and approach. Be helpful, empathetic, and actionable. Keep responses concise but meaningful (2-4 paragraphs max unless asked for more detail).${contextSection}`;
@@ -71,9 +76,8 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
     tools: {},
+    system: systemPrompt,
   });
-
-  const [hasSetContext, setHasSetContext] = useState(false);
 
   const isLoading = status === "streaming" || status === "submitted";
 
@@ -84,14 +88,9 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
       if (m.role === "user") {
         const textPart = m.parts.find(p => p.type === "text");
         if (textPart && textPart.type === "text") {
-          let displayContent = textPart.text;
-          const userPrefix = "\n\nUser: ";
-          if (displayContent.includes(userPrefix)) {
-            displayContent = displayContent.split(userPrefix).pop() || displayContent;
-          }
           msgs.push({
             id: m.id,
-            content: displayContent,
+            content: textPart.text,
             isUser: true,
             timestamp: new Date(),
           });
@@ -157,18 +156,10 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
         setActiveChatId(currentChatId);
       }
 
-      const messageToSend = !hasSetContext
-        ? `[System Context: ${systemPrompt}]\n\nUser: ${text.trim()}`
-        : text.trim();
-      
-      if (!hasSetContext) {
-        setHasSetContext(true);
-      }
-      
-      sendAgentMessage(messageToSend);
+      sendAgentMessage(text.trim());
       setInputText("");
     },
-    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, displayMessages.length, systemPrompt]
+    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading]
   );
 
   useEffect(() => {

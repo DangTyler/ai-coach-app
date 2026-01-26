@@ -6,6 +6,7 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { ChatProvider } from "@/contexts/ChatContext";
+import { CoachProvider } from "@/contexts/CoachContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -28,9 +29,11 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView>
-        <ChatProvider>
-          <RootLayoutNav />
-        </ChatProvider>
+        <CoachProvider>
+          <ChatProvider>
+            <RootLayoutNav />
+          </ChatProvider>
+        </CoachProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

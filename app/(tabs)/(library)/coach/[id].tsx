@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { ArrowRight, Sparkles } from "lucide-react-native";
+import { ArrowRight, Sparkles, Pencil } from "lucide-react-native";
 import React from "react";
 import {
   View,
@@ -12,15 +12,16 @@ import {
 } from "react-native";
 
 import Colors from "@/constants/colors";
-import { coaches } from "@/mocks/coaches";
+import { useCoaches } from "@/contexts/CoachContext";
 
 const { width } = Dimensions.get("window");
 
 export default function CoachDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { getCoachById } = useCoaches();
 
-  const coach = coaches.find((c) => c.id === id);
+  const coach = getCoachById(id || "");
 
   if (!coach) {
     return (
@@ -37,6 +38,13 @@ export default function CoachDetailScreen() {
     });
   };
 
+  const handleEditCoach = () => {
+    router.push({
+      pathname: '/coach/edit',
+      params: { id: coach.id },
+    });
+  };
+
   const handlePromptPress = (prompt: string) => {
     router.push({
       pathname: '/chat/[id]',
@@ -46,7 +54,17 @@ export default function CoachDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen options={{ title: coach.name }} />
+      <Stack.Screen
+        options={{
+          title: coach.name,
+          headerRight: () =>
+            coach.isCustom ? (
+              <TouchableOpacity onPress={handleEditCoach} style={{ padding: 8 }}>
+                <Pencil color={Colors.navy} size={20} />
+              </TouchableOpacity>
+            ) : null,
+        }}
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}

@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
+import { Search, Plus, Sparkles } from "lucide-react-native";
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { coaches, categories } from "@/mocks/coaches";
+import { useCoaches, defaultCategories } from "@/contexts/CoachContext";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - 48 - 12) / 2;
@@ -23,11 +23,12 @@ const cardWidth = (width - 48 - 12) / 2;
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { allCoaches } = useCoaches();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const filteredCoaches = useMemo(() => {
-    return coaches.filter((coach) => {
+    return allCoaches.filter((coach) => {
       const matchesSearch =
         coach.name.toLowerCase().includes(search.toLowerCase()) ||
         coach.tagline.toLowerCase().includes(search.toLowerCase());
@@ -35,17 +36,32 @@ export default function LibraryScreen() {
         selectedCategory === "All" || coach.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [search, selectedCategory]);
+  }, [search, selectedCategory, allCoaches]);
 
   const handleCoachPress = (coachId: string) => {
     router.push(`/coach/${coachId}`);
   };
 
+  const handleCreateCoach = () => {
+    router.push("/coach/edit");
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Find Your Coach</Text>
-        <Text style={styles.subtitle}>Expert guidance for every goal</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.title}>Find Your Coach</Text>
+            <Text style={styles.subtitle}>Expert guidance for every goal</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={handleCreateCoach}
+            activeOpacity={0.8}
+          >
+            <Plus color={Colors.white} size={20} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -65,7 +81,7 @@ export default function LibraryScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesContainer}
         >
-          {categories.map((category) => (
+          {defaultCategories.map((category) => (
             <TouchableOpacity
               key={category}
               style={[
@@ -103,6 +119,11 @@ export default function LibraryScreen() {
           >
             <View style={[styles.avatarContainer, { backgroundColor: item.color + '15' }]}>
               <Image source={{ uri: item.avatar }} style={styles.avatar} />
+              {item.isCustom && (
+                <View style={[styles.customBadge, { backgroundColor: item.color }]}>
+                  <Sparkles color={Colors.white} size={10} />
+                </View>
+              )}
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.coachName} numberOfLines={1}>
@@ -134,6 +155,11 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
   title: {
     fontSize: 32,
     fontWeight: "700",
@@ -144,6 +170,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     marginTop: 4,
+  },
+  createButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.navy,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   searchContainer: {
     flexDirection: "row",
@@ -217,11 +256,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 20,
     paddingBottom: 12,
+    position: "relative",
   },
   avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
+  },
+  customBadge: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardContent: {
     padding: 16,
