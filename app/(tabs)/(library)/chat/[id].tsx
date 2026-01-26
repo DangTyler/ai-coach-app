@@ -71,8 +71,9 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
     tools: {},
-    system: systemPrompt,
   });
+
+  const [hasSetContext, setHasSetContext] = useState(false);
 
   const isLoading = status === "streaming" || status === "submitted";
 
@@ -83,9 +84,14 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
       if (m.role === "user") {
         const textPart = m.parts.find(p => p.type === "text");
         if (textPart && textPart.type === "text") {
+          let displayContent = textPart.text;
+          const userPrefix = "\n\nUser: ";
+          if (displayContent.includes(userPrefix)) {
+            displayContent = displayContent.split(userPrefix).pop() || displayContent;
+          }
           msgs.push({
             id: m.id,
-            content: textPart.text,
+            content: displayContent,
             isUser: true,
             timestamp: new Date(),
           });
@@ -151,7 +157,15 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
         setActiveChatId(currentChatId);
       }
 
-      sendAgentMessage(text.trim());
+      const messageToSend = !hasSetContext
+        ? `[System Context: ${systemPrompt}]\n\nUser: ${text.trim()}`
+        : text.trim();
+      
+      if (!hasSetContext) {
+        setHasSetContext(true);
+      }
+      
+      sendAgentMessage(messageToSend);
       setInputText("");
     },
     [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, displayMessages.length, systemPrompt]
