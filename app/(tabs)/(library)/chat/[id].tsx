@@ -1,6 +1,7 @@
+import { useRorkAgent } from "@rork-ai/toolkit-sdk";
 import { useLocalSearchParams, Stack } from "expo-router";
-import { Send, SlidersHorizontal, X, ChevronDown } from "lucide-react-native";
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import { Send, SlidersHorizontal, X } from "lucide-react-native";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,15 +17,24 @@ import {
   ScrollView,
   Dimensions,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
-import { defaultContextCards, ContextCard, Message } from "@/mocks/chats";
+import { defaultContextCards, ContextCard } from "@/mocks/chats";
 import { coaches } from "@/mocks/coaches";
 
 const { height: screenHeight } = Dimensions.get("window");
+
+interface DisplayMessage {
+  id: string;
+  content: string;
+  isUser: boolean;
+  timestamp: Date;
+  isStreaming?: boolean;
+}
 
 export default function ChatScreen() {
   const { id, initialPrompt, chatId } = useLocalSearchParams<{
@@ -35,16 +45,67 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
 
   const coach = coaches.find((c) => c.id === id);
-  const { getMessages, addMessage, getOrCreateChat } = useChats();
+  const { getOrCreateChat } = useChats();
   
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
-  const messages = activeChatId ? getMessages(activeChatId) : [];
   const [inputText, setInputText] = useState("");
   const [showContext, setShowContext] = useState(false);
   const [contextCards, setContextCards] = useState<ContextCard[]>(defaultContextCards);
+  const [hasUsedInitialPrompt, setHasUsedInitialPrompt] = useState(false);
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
+
+  const systemPrompt = useMemo(() => {
+    if (!coach) return "";
+    
+    const enabledCards = contextCards.filter(c => c.enabled && c.content.trim());
+    const contextSection = enabledCards.length > 0
+      ? `\n\nUser Context:\n${enabledCards.map(c => `- ${c.title}: ${c.content}`).join('\n')}`
+      : "";
+    
+    return `You are ${coach.name}, ${coach.tagline}. ${coach.promise}
+
+Your expertise is in ${coach.category}. Respond as this coach would - with their unique perspective, tone, and approach. Be helpful, empathetic, and actionable. Keep responses concise but meaningful (2-4 paragraphs max unless asked for more detail).${contextSection}`;
+  }, [coach, contextCards]);
+
+  const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
+    systemPrompt,
+  });
+
+  const isLoading = status === "streaming" || status === "submitted";
+
+  const displayMessages = useMemo((): DisplayMessage[] => {
+    const msgs: DisplayMessage[] = [];
+    
+    agentMessages.forEach((m) => {
+      if (m.role === "user") {
+        const textPart = m.parts.find(p => p.type === "text");
+        if (textPart && textPart.type === "text") {
+          msgs.push({
+            id: m.id,
+            content: textPart.text,
+            isUser: true,
+            timestamp: new Date(),
+          });
+        }
+      } else if (m.role === "assistant") {
+        const textParts = m.parts.filter(p => p.type === "text");
+        const content = textParts.map(p => p.type === "text" ? p.text : "").join("");
+        if (content) {
+          msgs.push({
+            id: m.id,
+            content,
+            isUser: false,
+            timestamp: new Date(),
+            isStreaming: status === "streaming",
+          });
+        }
+      }
+    });
+    
+    return msgs;
+  }, [agentMessages, status]);
 
   const openSheet = useCallback(() => {
     setShowContext(true);
@@ -79,9 +140,9 @@ export default function ChatScreen() {
     ]).start(() => setShowContext(false));
   }, [slideAnim, overlayAnim]);
 
-  const sendMessage = useCallback(
+  const handleSendMessage = useCallback(
     (text: string) => {
-      if (!text.trim() || !coach) return;
+      if (!text.trim() || !coach || isLoading) return;
 
       let currentChatId = activeChatId;
       if (!currentChatId) {
@@ -89,41 +150,18 @@ export default function ChatScreen() {
         setActiveChatId(currentChatId);
       }
 
-      const userMessage: Message = {
-        id: `user-${Date.now()}`,
-        content: text.trim(),
-        isUser: true,
-        timestamp: new Date(),
-      };
-
-      addMessage(currentChatId, userMessage);
+      sendAgentMessage(text.trim());
       setInputText("");
-
-      const chatIdForResponse = currentChatId;
-      setTimeout(() => {
-        const responses = [
-          `That's a great question. ${text.includes("?") ? "Let me think about that..." : "I'd love to help you with this."}`,
-          `I understand what you're going through. Here's my perspective...`,
-          `Based on my experience, I'd suggest starting by breaking this down into smaller steps.`,
-          `This is something many of my clients face. The key is to focus on what you can control.`,
-        ];
-        const aiMessage: Message = {
-          id: `ai-${Date.now()}`,
-          content: responses[Math.floor(Math.random() * responses.length)],
-          isUser: false,
-          timestamp: new Date(),
-        };
-        addMessage(chatIdForResponse, aiMessage);
-      }, 1000);
     },
-    [coach, activeChatId, getOrCreateChat, addMessage]
+    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading]
   );
 
   useEffect(() => {
-    if (initialPrompt) {
-      sendMessage(initialPrompt);
+    if (initialPrompt && !hasUsedInitialPrompt) {
+      setHasUsedInitialPrompt(true);
+      handleSendMessage(initialPrompt);
     }
-  }, []);
+  }, [initialPrompt, hasUsedInitialPrompt, handleSendMessage]);
 
   const toggleCard = useCallback((cardId: string) => {
     setContextCards((prev) =>
@@ -147,7 +185,7 @@ export default function ChatScreen() {
     );
   }
 
-  const renderMessage = ({ item }: { item: Message }) => (
+  const renderMessage = ({ item }: { item: DisplayMessage }) => (
     <View
       style={[
         styles.messageContainer,
@@ -174,6 +212,21 @@ export default function ChatScreen() {
       </View>
     </View>
   );
+
+  const renderTypingIndicator = () => {
+    if (!isLoading || displayMessages.length === 0 || displayMessages[displayMessages.length - 1]?.isUser === false) {
+      return null;
+    }
+    return (
+      <View style={[styles.messageContainer, styles.aiMessage]}>
+        <Image source={{ uri: coach.avatar }} style={styles.messageAvatar} />
+        <View style={[styles.messageBubble, styles.aiBubble, styles.typingBubble]}>
+          <ActivityIndicator size="small" color={coach.color} />
+          <Text style={styles.typingText}>Thinking...</Text>
+        </View>
+      </View>
+    );
+  };
 
   const enabledCount = contextCards.filter((c) => c.enabled).length;
 
@@ -202,7 +255,7 @@ export default function ChatScreen() {
         }}
       />
 
-      {messages.length === 0 ? (
+      {displayMessages.length === 0 ? (
         <View style={styles.emptyState}>
           <Image source={{ uri: coach.avatar }} style={styles.emptyAvatar} />
           <Text style={styles.emptyTitle}>Chat with {coach.name}</Text>
@@ -213,13 +266,14 @@ export default function ChatScreen() {
       ) : (
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={displayMessages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: true })
           }
+          ListFooterComponent={renderTypingIndicator}
         />
       )}
 
@@ -237,16 +291,20 @@ export default function ChatScreen() {
           <TouchableOpacity
             style={[
               styles.sendButton,
-              inputText.trim() && { backgroundColor: coach.color },
+              inputText.trim() && !isLoading && { backgroundColor: coach.color },
             ]}
-            onPress={() => sendMessage(inputText)}
-            disabled={!inputText.trim()}
+            onPress={() => handleSendMessage(inputText)}
+            disabled={!inputText.trim() || isLoading}
             activeOpacity={0.8}
           >
-            <Send
-              color={inputText.trim() ? Colors.white : Colors.textMuted}
-              size={20}
-            />
+            {isLoading ? (
+              <ActivityIndicator size="small" color={Colors.textMuted} />
+            ) : (
+              <Send
+                color={inputText.trim() ? Colors.white : Colors.textMuted}
+                size={20}
+              />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -541,5 +599,15 @@ const styles = StyleSheet.create({
   contextCardInputDisabled: {
     backgroundColor: Colors.borderLight,
     color: Colors.textMuted,
+  },
+  typingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  typingText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginLeft: 8,
   },
 });
