@@ -40,14 +40,6 @@ export default function LibraryLayout() {
           headerBackTitle: "Back",
         }}
       />
-      <Stack.Screen
-        name="coach/edit"
-        options={{
-          title: "Create Coach",
-          headerBackTitle: "Back",
-          presentation: "card",
-        }}
-      />
     </Stack>
   );
 }

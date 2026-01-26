@@ -23,8 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
-import { useCoaches } from "@/contexts/CoachContext";
 import { defaultContextCards, ContextCard } from "@/mocks/chats";
+import { coaches } from "@/mocks/coaches";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -44,8 +44,7 @@ export default function ChatScreen() {
   }>();
   const insets = useSafeAreaInsets();
 
-  const { getCoach } = useCoaches();
-  const coach = getCoach(id);
+  const coach = coaches.find((c) => c.id === id);
   const { getOrCreateChat } = useChats();
   
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
