@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
+import { Search, Plus } from "lucide-react-native";
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -15,7 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { coaches, categories } from "@/mocks/coaches";
+import { useCoaches, CustomCoach } from "@/contexts/CoachContext";
+import { coaches as defaultCoaches, categories, Coach } from "@/mocks/coaches";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - 48 - 12) / 2;
@@ -23,11 +24,16 @@ const cardWidth = (width - 48 - 12) / 2;
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { customCoaches } = useCoaches();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
+  const allCoaches = useMemo((): (Coach | CustomCoach)[] => {
+    return [...customCoaches, ...defaultCoaches];
+  }, [customCoaches]);
+
   const filteredCoaches = useMemo(() => {
-    return coaches.filter((coach) => {
+    return allCoaches.filter((coach) => {
       const matchesSearch =
         coach.name.toLowerCase().includes(search.toLowerCase()) ||
         coach.tagline.toLowerCase().includes(search.toLowerCase());
@@ -35,7 +41,7 @@ export default function LibraryScreen() {
         selectedCategory === "All" || coach.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [search, selectedCategory]);
+  }, [search, selectedCategory, allCoaches]);
 
   const handleCoachPress = (coachId: string) => {
     router.push(`/coach/${coachId}`);
@@ -47,6 +53,15 @@ export default function LibraryScreen() {
         <Text style={styles.title}>Find Your Coach</Text>
         <Text style={styles.subtitle}>Expert guidance for every goal</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={() => router.push("/create-coach")}
+        activeOpacity={0.8}
+      >
+        <Plus color={Colors.white} size={20} />
+        <Text style={styles.createButtonText}>Create Coach</Text>
+      </TouchableOpacity>
 
       <View style={styles.searchContainer}>
         <Search color={Colors.textMuted} size={20} />
@@ -103,6 +118,11 @@ export default function LibraryScreen() {
           >
             <View style={[styles.avatarContainer, { backgroundColor: item.color + '15' }]}>
               <Image source={{ uri: item.avatar }} style={styles.avatar} />
+              {'isCustom' in item && item.isCustom && (
+                <View style={styles.customBadge}>
+                  <Text style={styles.customBadgeText}>Custom</Text>
+                </View>
+              )}
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.coachName} numberOfLines={1}>
@@ -144,6 +164,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.textSecondary,
     marginTop: 4,
+  },
+  createButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.accent,
+    marginHorizontal: 24,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.white,
   },
   searchContainer: {
     flexDirection: "row",
@@ -222,6 +258,20 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
+  },
+  customBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  customBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: Colors.white,
   },
   cardContent: {
     padding: 16,

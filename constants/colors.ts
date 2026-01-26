@@ -17,4 +17,5 @@ export default {
   overlay: 'rgba(26, 26, 46, 0.5)',
   white: '#FFFFFF',
   inputBg: '#F9FAFB',
+  error: '#EF4444',
 };
