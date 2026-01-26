@@ -71,7 +71,6 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
     tools: {},
-    system: systemPrompt,
   });
 
   const isLoading = status === "streaming" || status === "submitted";
@@ -151,10 +150,14 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
         setActiveChatId(currentChatId);
       }
 
-      sendAgentMessage(text.trim());
+      const isFirstMessage = agentMessages.length === 0;
+      const messageToSend = isFirstMessage 
+        ? `[System Context: ${systemPrompt}]\n\nUser: ${text.trim()}`
+        : text.trim();
+      sendAgentMessage(messageToSend);
       setInputText("");
     },
-    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, displayMessages.length, systemPrompt]
+    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, agentMessages.length, systemPrompt]
   );
 
   useEffect(() => {
