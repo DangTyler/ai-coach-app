@@ -61,24 +61,32 @@ export default function ChatScreen() {
     if (!coach) return "";
     
     const enabledCards = contextCards.filter(c => c.enabled && c.content.trim());
-    const contextSection = enabledCards.length > 0
-      ? `\n\nUser Context:\n${enabledCards.map(c => `- ${c.title}: ${c.content}`).join('\n')}`
+    const userContextSection = enabledCards.length > 0
+      ? `\n\nThe user has shared the following about themselves:\n${enabledCards.map(c => `${c.title}: ${c.content}`).join('\n')}\n\nUse this information to personalize your responses, but don't explicitly reference these details unless relevant.`
       : "";
     
-    if (coach.systemPrompt) {
-      return `${coach.systemPrompt}${contextSection}`;
-    }
-    
-    return `You are ${coach.name}, ${coach.tagline}. ${coach.promise}
+    const basePrompt = coach.systemPrompt || `You are ${coach.name}. ${coach.tagline}.
 
-Your expertise is in ${coach.category}. Respond as this coach would - with their unique perspective, tone, and approach. Be helpful, empathetic, and actionable. Keep responses concise but meaningful (2-4 paragraphs max unless asked for more detail).${contextSection}`;
+Your core promise: ${coach.promise}
+
+Your area of expertise: ${coach.category}
+
+Personality & Approach:
+- Speak naturally as yourself, not as an AI assistant
+- Be warm, direct, and genuinely helpful
+- Draw from your expertise to give practical, actionable advice
+- Ask clarifying questions when needed
+- Keep responses focused and conversational (2-4 paragraphs unless more detail is requested)
+- Show personality - you have opinions and a unique perspective`;
+    
+    return `${basePrompt}${userContextSection}`;
   }, [coach, contextCards]);
 
-  const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
+  const { messages: agentMessages, sendMessage: sendAgentMessage, status, setMessages } = useRorkAgent({
     tools: {},
   });
 
-  const [hasSetContext, setHasSetContext] = useState(false);
+  const [isSystemInitialized, setIsSystemInitialized] = useState(false);
   const [lastSyncedMessageCount, setLastSyncedMessageCount] = useState(0);
 
   const isLoading = status === "streaming" || status === "submitted";
@@ -148,6 +156,19 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
     ]).start(() => setShowContext(false));
   }, [slideAnim, overlayAnim]);
 
+  useEffect(() => {
+    if (!isSystemInitialized && systemPrompt && coach) {
+      setMessages([
+        {
+          id: 'system-init',
+          role: 'system' as const,
+          parts: [{ type: 'text' as const, text: systemPrompt }],
+        },
+      ]);
+      setIsSystemInitialized(true);
+    }
+  }, [systemPrompt, coach, isSystemInitialized, setMessages]);
+
   const handleSendMessage = useCallback(
     (text: string) => {
       if (!text.trim() || !coach || isLoading) return;
@@ -158,15 +179,10 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
         setActiveChatId(currentChatId);
       }
 
-      if (!hasSetContext && systemPrompt) {
-        sendAgentMessage(`[System Context: ${systemPrompt}]\n\nUser: ${text.trim()}`);
-        setHasSetContext(true);
-      } else {
-        sendAgentMessage(text.trim());
-      }
+      sendAgentMessage(text.trim());
       setInputText("");
     },
-    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, hasSetContext, systemPrompt]
+    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading]
   );
 
   useEffect(() => {
