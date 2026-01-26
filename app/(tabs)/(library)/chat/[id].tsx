@@ -76,8 +76,9 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
     tools: {},
-    system: systemPrompt,
   });
+
+  const [hasInitializedSystem, setHasInitializedSystem] = useState(false);
 
   const isLoading = status === "streaming" || status === "submitted";
 
@@ -156,10 +157,19 @@ Your expertise is in ${coach.category}. Respond as this coach would - with their
         setActiveChatId(currentChatId);
       }
 
-      sendAgentMessage(text.trim());
+      // Include system prompt context in the message for the AI
+      const messageWithContext = !hasInitializedSystem && systemPrompt
+        ? `[System Context: ${systemPrompt}]\n\nUser: ${text.trim()}`
+        : text.trim();
+      
+      if (!hasInitializedSystem) {
+        setHasInitializedSystem(true);
+      }
+
+      sendAgentMessage(messageWithContext);
       setInputText("");
     },
-    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading]
+    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, hasInitializedSystem, systemPrompt]
   );
 
   useEffect(() => {
