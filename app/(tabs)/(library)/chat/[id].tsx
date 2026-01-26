@@ -69,7 +69,9 @@ export default function ChatScreen() {
 Your expertise is in ${coach.category}. Respond as this coach would - with their unique perspective, tone, and approach. Be helpful, empathetic, and actionable. Keep responses concise but meaningful (2-4 paragraphs max unless asked for more detail).${contextSection}`;
   }, [coach, contextCards]);
 
-  const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({});
+  const { messages: agentMessages, sendMessage: sendAgentMessage, status } = useRorkAgent({
+    tools: {},
+  });
 
   const isLoading = status === "streaming" || status === "submitted";
 
