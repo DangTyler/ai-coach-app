@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
+import { Search, Plus } from "lucide-react-native";
 import React, { useState, useMemo } from "react";
 import {
   View,
@@ -15,7 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { coaches, categories } from "@/mocks/coaches";
+import { useCoaches } from "@/contexts/CoachContext";
+import { categories } from "@/mocks/coaches";
 
 const { width } = Dimensions.get("window");
 const cardWidth = (width - 48 - 12) / 2;
@@ -25,6 +26,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const { coaches, customCoaches, isCustomCoach } = useCoaches();
 
   const filteredCoaches = useMemo(() => {
     return coaches.filter((coach) => {
@@ -47,6 +49,15 @@ export default function LibraryScreen() {
         <Text style={styles.title}>Find Your Coach</Text>
         <Text style={styles.subtitle}>Expert guidance for every goal</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.createButton}
+        onPress={() => router.push("/coach/edit")}
+        activeOpacity={0.8}
+      >
+        <Plus color={Colors.white} size={20} />
+        <Text style={styles.createButtonText}>Create Coach</Text>
+      </TouchableOpacity>
 
       <View style={styles.searchContainer}>
         <Search color={Colors.textMuted} size={20} />
@@ -111,10 +122,17 @@ export default function LibraryScreen() {
               <Text style={styles.coachTagline} numberOfLines={2}>
                 {item.tagline}
               </Text>
-              <View style={[styles.categoryBadge, { backgroundColor: item.color + '15' }]}>
-                <Text style={[styles.categoryBadgeText, { color: item.color }]}>
-                  {item.category}
-                </Text>
+              <View style={styles.badgeRow}>
+                <View style={[styles.categoryBadge, { backgroundColor: item.color + '15' }]}>
+                  <Text style={[styles.categoryBadgeText, { color: item.color }]}>
+                    {item.category}
+                  </Text>
+                </View>
+                {isCustomCoach(item.id) && (
+                  <View style={styles.customBadge}>
+                    <Text style={styles.customBadgeText}>Custom</Text>
+                  </View>
+                )}
               </View>
             </View>
           </TouchableOpacity>
@@ -242,7 +260,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   categoryBadge: {
-    marginTop: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -250,5 +267,38 @@ const styles = StyleSheet.create({
   categoryBadgeText: {
     fontSize: 11,
     fontWeight: "600",
+  },
+  createButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.navy,
+    marginHorizontal: 24,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.white,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 12,
+  },
+  customBadge: {
+    backgroundColor: Colors.navy + "15",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  customBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: Colors.navy,
   },
 });
