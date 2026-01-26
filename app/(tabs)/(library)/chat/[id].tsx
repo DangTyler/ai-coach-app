@@ -158,16 +158,36 @@ Personality & Approach:
 
   useEffect(() => {
     if (!isSystemInitialized && systemPrompt && coach) {
-      setMessages([
+      const initialMessages: Array<{
+        id: string;
+        role: 'system' | 'user' | 'assistant';
+        parts: Array<{ type: 'text'; text: string }>;
+      }> = [
         {
           id: 'system-init',
           role: 'system' as const,
           parts: [{ type: 'text' as const, text: systemPrompt }],
         },
-      ]);
+      ];
+
+      // Load existing messages if we have a chatId
+      if (activeChatId) {
+        const existingMessages = getMessages(activeChatId);
+        existingMessages.forEach((msg) => {
+          initialMessages.push({
+            id: msg.id,
+            role: msg.isUser ? 'user' as const : 'assistant' as const,
+            parts: [{ type: 'text' as const, text: msg.content }],
+          });
+        });
+        // Set synced count so we don't re-save these messages
+        setLastSyncedMessageCount(existingMessages.length);
+      }
+
+      setMessages(initialMessages);
       setIsSystemInitialized(true);
     }
-  }, [systemPrompt, coach, isSystemInitialized, setMessages]);
+  }, [systemPrompt, coach, isSystemInitialized, setMessages, activeChatId, getMessages]);
 
   const handleSendMessage = useCallback(
     (text: string) => {
