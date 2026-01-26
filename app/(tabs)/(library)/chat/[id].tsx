@@ -23,9 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
-import { useCoaches, CustomCoach } from "@/contexts/CoachContext";
 import { defaultContextCards, ContextCard } from "@/mocks/chats";
-import { coaches as defaultCoaches, Coach } from "@/mocks/coaches";
+import { coaches } from "@/mocks/coaches";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -45,10 +44,7 @@ export default function ChatScreen() {
   }>();
   const insets = useSafeAreaInsets();
 
-  const { customCoaches } = useCoaches();
-  
-  const coach: Coach | CustomCoach | undefined = 
-    customCoaches.find((c) => c.id === id) || defaultCoaches.find((c) => c.id === id);
+  const coach = coaches.find((c) => c.id === id);
   const { getOrCreateChat } = useChats();
   
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
@@ -67,13 +63,6 @@ export default function ChatScreen() {
     const contextSection = enabledCards.length > 0
       ? `\n\nUser Context:\n${enabledCards.map(c => `- ${c.title}: ${c.content}`).join('\n')}`
       : "";
-    
-    const isCustom = 'isCustom' in coach && coach.isCustom;
-    const customSystemPrompt = isCustom && 'systemPrompt' in coach ? coach.systemPrompt : "";
-    
-    if (customSystemPrompt) {
-      return `${customSystemPrompt}\n\nYou are ${coach.name}, ${coach.tagline}.${contextSection}`;
-    }
     
     return `You are ${coach.name}, ${coach.tagline}. ${coach.promise}
 

@@ -6,7 +6,6 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { ChatProvider } from "@/contexts/ChatContext";
-import { CoachProvider } from "@/contexts/CoachContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -17,7 +16,6 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="create-coach" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
@@ -30,11 +28,9 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView>
-        <CoachProvider>
-          <ChatProvider>
-            <RootLayoutNav />
-          </ChatProvider>
-        </CoachProvider>
+        <ChatProvider>
+          <RootLayoutNav />
+        </ChatProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
   );

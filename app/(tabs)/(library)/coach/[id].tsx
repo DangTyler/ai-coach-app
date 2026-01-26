@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { ArrowRight, Sparkles, Pencil } from "lucide-react-native";
+import { ArrowRight, Sparkles } from "lucide-react-native";
 import React from "react";
 import {
   View,
@@ -12,20 +12,15 @@ import {
 } from "react-native";
 
 import Colors from "@/constants/colors";
-import { useCoaches, CustomCoach } from "@/contexts/CoachContext";
-import { coaches as defaultCoaches, Coach } from "@/mocks/coaches";
+import { coaches } from "@/mocks/coaches";
 
 const { width } = Dimensions.get("window");
 
 export default function CoachDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { customCoaches } = useCoaches();
 
-  const coach: Coach | CustomCoach | undefined = 
-    customCoaches.find((c) => c.id === id) || defaultCoaches.find((c) => c.id === id);
-  
-  const isCustomCoach = coach && 'isCustom' in coach && coach.isCustom;
+  const coach = coaches.find((c) => c.id === id);
 
   if (!coach) {
     return (
@@ -49,24 +44,9 @@ export default function CoachDetailScreen() {
     });
   };
 
-  const handleEdit = () => {
-    router.push({ pathname: "/create-coach", params: { editId: id } });
-  };
-
   return (
     <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: coach.name,
-          headerRight: isCustomCoach
-            ? () => (
-                <TouchableOpacity onPress={handleEdit} style={styles.editButton}>
-                  <Pencil color={Colors.navy} size={20} />
-                </TouchableOpacity>
-              )
-            : undefined,
-        }}
-      />
+      <Stack.Screen options={{ title: coach.name }} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -125,10 +105,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  editButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
   },
   scrollContent: {
     paddingBottom: 120,
