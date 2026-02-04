@@ -1,5 +1,6 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from "expo-router";
-import { MessageSquare, Clock, ChevronRight } from "lucide-react-native";
+import { MessageSquare, Clock, ChevronRight, Trash2 } from "lucide-react-native";
 import React from "react";
 import {
   View,
@@ -8,16 +9,19 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  Alert,
+  Animated,
 } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
-import { SavedChat } from "@/mocks/chats";
+import { SavedChat } from "@/store/chatStore";
 
 function formatTimestamp(date: Date): string {
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = now.getTime() - new Date(date).getTime();
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
@@ -31,60 +35,121 @@ function formatTimestamp(date: Date): string {
   } else if (diffDays < 7) {
     return `${diffDays}d ago`;
   } else {
-    return date.toLocaleDateString();
+    return new Date(date).toLocaleDateString();
   }
 }
 
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { savedChats } = useChats();
+  const { savedChats, deleteChat } = useChats();
 
   const handleChatPress = (chat: SavedChat) => {
     router.push(`/(library)/chat/${chat.coachId}?chatId=${chat.id}` as any);
   };
 
+  const handleDeleteChat = (chat: SavedChat) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    Alert.alert(
+      "Delete Conversation",
+      `Are you sure you want to delete this conversation with ${chat.coachName}?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            deleteChat(chat.id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          },
+        },
+      ]
+    );
+  };
+
+  const renderRightActions = (
+    chat: SavedChat,
+    progress: Animated.AnimatedInterpolation<number>,
+    dragX: Animated.AnimatedInterpolation<number>
+  ) => {
+    const translateX = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [0, 100],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.deleteAction,
+          { transform: [{ translateX }] },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteChat(chat)}
+        >
+          <Trash2 color={Colors.white} size={24} />
+          <Text style={styles.deleteText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   const renderChatItem = ({ item }: { item: SavedChat }) => (
-    <TouchableOpacity
-      style={styles.chatCard}
-      onPress={() => handleChatPress(item)}
-      activeOpacity={0.7}
+    <Swipeable
+      renderRightActions={(progress, dragX) => renderRightActions(item, progress, dragX)}
+      overshootRight={false}
+      friction={2}
+      rightThreshold={40}
     >
-      <Image source={{ uri: item.coachAvatar }} style={styles.avatar} />
-      <View style={styles.chatContent}>
-        <View style={styles.chatHeader}>
-          <Text style={styles.coachName}>{item.coachName}</Text>
-          <View style={styles.timeContainer}>
-            <Clock color={Colors.textMuted} size={12} />
-            <Text style={styles.timestamp}>
-              {formatTimestamp(item.timestamp)}
+      <TouchableOpacity
+        style={styles.chatCard}
+        onPress={() => handleChatPress(item)}
+        activeOpacity={0.7}
+      >
+        <Image source={{ uri: item.coachAvatar }} style={styles.avatar} />
+        <View style={styles.chatContent}>
+          <View style={styles.chatHeader}>
+            <Text style={styles.coachName}>{item.coachName}</Text>
+            <View style={styles.timeContainer}>
+              <Clock color={Colors.textMuted} size={12} />
+              <Text style={styles.timestamp}>
+                {formatTimestamp(item.timestamp)}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.lastMessage} numberOfLines={2}>
+            {item.lastMessage || "New conversation"}
+          </Text>
+          <View style={styles.messageCount}>
+            <MessageSquare color={Colors.textMuted} size={14} />
+            <Text style={styles.messageCountText}>
+              {item.messages.length} messages
             </Text>
           </View>
         </View>
-        <Text style={styles.lastMessage} numberOfLines={2}>
-          {item.lastMessage}
-        </Text>
-        <View style={styles.messageCount}>
-          <MessageSquare color={Colors.textMuted} size={14} />
-          <Text style={styles.messageCountText}>
-            {item.messages.length} messages
-          </Text>
-        </View>
-      </View>
-      <ChevronRight color={Colors.textMuted} size={20} />
-    </TouchableOpacity>
+        <ChevronRight color={Colors.textMuted} size={20} />
+      </TouchableOpacity>
+    </Swipeable>
   );
+
+  const chatsWithMessages = savedChats.filter(c => c.messages.length > 0);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Saved Chats</Text>
         <Text style={styles.subtitle}>
-          {savedChats.filter(c => c.messages.length > 0).length} conversation{savedChats.filter(c => c.messages.length > 0).length !== 1 ? "s" : ""}
+          {chatsWithMessages.length} conversation{chatsWithMessages.length !== 1 ? "s" : ""}
         </Text>
       </View>
 
-      {savedChats.filter(c => c.messages.length > 0).length === 0 ? (
+      {chatsWithMessages.length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
             <MessageSquare color={Colors.textMuted} size={48} />
@@ -96,7 +161,7 @@ export default function SavedScreen() {
         </View>
       ) : (
         <FlatList
-          data={savedChats.filter(c => c.messages.length > 0)}
+          data={chatsWithMessages}
           keyExtractor={(item) => item.id}
           renderItem={renderChatItem}
           contentContainerStyle={styles.listContainer}
@@ -218,5 +283,25 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
     lineHeight: 22,
+  },
+  deleteAction: {
+    backgroundColor: Colors.accent,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  deleteButton: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 90,
+    height: "100%",
+    paddingHorizontal: 16,
+  },
+  deleteText: {
+    color: Colors.white,
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 4,
   },
 });

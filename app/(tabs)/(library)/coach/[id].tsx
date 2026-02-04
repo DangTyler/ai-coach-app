@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { ArrowRight, Sparkles, Pencil } from "lucide-react-native";
+import { ArrowRight, Sparkles, Pencil, MessageSquare, Clock } from "lucide-react-native";
 import React from "react";
 import {
   View,
@@ -13,15 +13,39 @@ import {
 
 import Colors from "@/constants/colors";
 import { useCoaches } from "@/contexts/CoachContext";
+import { useChatStore, SavedChat } from "@/store/chatStore";
 
 const { width } = Dimensions.get("window");
+
+function formatTimestamp(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 60) {
+    return `${diffMins}m ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  } else if (diffDays === 1) {
+    return "Yesterday";
+  } else if (diffDays < 7) {
+    return `${diffDays}d ago`;
+  } else {
+    return new Date(date).toLocaleDateString();
+  }
+}
 
 export default function CoachDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { getCoachById } = useCoaches();
+  const { getChatsForCoach, addChat } = useChatStore();
 
   const coach = getCoachById(id || "");
+  const existingChats = getChatsForCoach(id || "");
+  const hasExistingChats = existingChats.length > 0;
 
   if (!coach) {
     return (
@@ -31,10 +55,18 @@ export default function CoachDetailScreen() {
     );
   }
 
-  const handleStartChat = () => {
+  const handleStartNewChat = () => {
+    const chatId = addChat(coach.id);
     router.push({
       pathname: '/chat/[id]',
-      params: { id: coach.id },
+      params: { id: coach.id, chatId },
+    });
+  };
+
+  const handleContinueChat = (chatId: string) => {
+    router.push({
+      pathname: '/chat/[id]',
+      params: { id: coach.id, chatId },
     });
   };
 
@@ -46,9 +78,10 @@ export default function CoachDetailScreen() {
   };
 
   const handlePromptPress = (prompt: string) => {
+    const chatId = addChat(coach.id);
     router.push({
       pathname: '/chat/[id]',
-      params: { id: coach.id, initialPrompt: prompt },
+      params: { id: coach.id, chatId, initialPrompt: prompt },
     });
   };
 
@@ -90,6 +123,41 @@ export default function CoachDetailScreen() {
           <Text style={styles.promiseText}>{coach.promise}</Text>
         </View>
 
+        {hasExistingChats && (
+          <View style={styles.chatsSection}>
+            <Text style={styles.chatsSectionTitle}>Previous Conversations</Text>
+            {existingChats.map((chat: SavedChat) => (
+              <TouchableOpacity
+                key={chat.id}
+                style={styles.chatCard}
+                onPress={() => handleContinueChat(chat.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.chatCardContent}>
+                  <Text style={styles.chatCardMessage} numberOfLines={1}>
+                    {chat.lastMessage || "New conversation"}
+                  </Text>
+                  <View style={styles.chatCardMeta}>
+                    <View style={styles.chatCardMetaItem}>
+                      <MessageSquare color={Colors.textMuted} size={12} />
+                      <Text style={styles.chatCardMetaText}>
+                        {chat.messages.length} messages
+                      </Text>
+                    </View>
+                    <View style={styles.chatCardMetaItem}>
+                      <Clock color={Colors.textMuted} size={12} />
+                      <Text style={styles.chatCardMetaText}>
+                        {formatTimestamp(chat.timestamp)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <ArrowRight color={Colors.textMuted} size={18} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={styles.promptsSection}>
           <Text style={styles.promptsSectionTitle}>Try asking me</Text>
           {coach.prompts.map((prompt, index) => (
@@ -109,10 +177,12 @@ export default function CoachDetailScreen() {
       <View style={styles.bottomContainer}>
         <TouchableOpacity
           style={[styles.startButton, { backgroundColor: coach.color }]}
-          onPress={handleStartChat}
+          onPress={handleStartNewChat}
           activeOpacity={0.85}
         >
-          <Text style={styles.startButtonText}>Start Chat</Text>
+          <Text style={styles.startButtonText}>
+            {hasExistingChats ? "Start New Chat" : "Start Chat"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -195,6 +265,54 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 12,
     lineHeight: 24,
+  },
+  chatsSection: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+  },
+  chatsSectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.navy,
+    marginBottom: 12,
+  },
+  chatCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: Colors.white,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    marginBottom: 10,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  chatCardContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  chatCardMessage: {
+    fontSize: 15,
+    color: Colors.text,
+    marginBottom: 6,
+  },
+  chatCardMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  chatCardMetaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  chatCardMetaText: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   promptsSection: {
     marginTop: 24,

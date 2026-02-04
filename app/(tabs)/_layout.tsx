@@ -8,6 +8,7 @@ import Colors from "@/constants/colors";
 export default function TabLayout() {
   return (
     <Tabs
+      backBehavior="none"
       screenOptions={{
         tabBarActiveTintColor: Colors.navy,
         tabBarInactiveTintColor: Colors.textMuted,
