@@ -1,6 +1,8 @@
 import { useRorkAgent } from "@rork-ai/toolkit-sdk";
+import { Audio } from "expo-av";
+import * as Speech from "expo-speech";
 import { useLocalSearchParams, Stack } from "expo-router";
-import { Send, SlidersHorizontal, X } from "lucide-react-native";
+import { Send, SlidersHorizontal, X, Mic, Volume2, Square } from "lucide-react-native";
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
@@ -18,6 +20,7 @@ import {
   Dimensions,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -88,6 +91,15 @@ Personality & Approach:
 
   const [isSystemInitialized, setIsSystemInitialized] = useState(false);
   const [lastSyncedMessageCount, setLastSyncedMessageCount] = useState(0);
+  
+  // Voice states
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const isLoading = status === "streaming" || status === "submitted";
 
@@ -158,11 +170,11 @@ Personality & Approach:
 
   useEffect(() => {
     if (!isSystemInitialized && systemPrompt && coach) {
-      const initialMessages: Array<{
+      const initialMessages: {
         id: string;
         role: 'system' | 'user' | 'assistant';
-        parts: Array<{ type: 'text'; text: string }>;
-      }> = [
+        parts: { type: 'text'; text: string }[];
+      }[] = [
         {
           id: 'system-init',
           role: 'system' as const,
@@ -245,6 +257,207 @@ Personality & Approach:
     );
   }, []);
 
+  // Voice recording functions
+  const startRecording = useCallback(async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        audioChunksRef.current = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        
+        mediaRecorderRef.current = mediaRecorder;
+        mediaRecorder.start();
+        setIsRecording(true);
+        console.log('Web recording started');
+      } else {
+        const { status } = await Audio.requestPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant microphone access to use voice input.');
+          return;
+        }
+        
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+        
+        const recording = new Audio.Recording();
+        await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        
+        await recording.startAsync();
+        recordingRef.current = recording;
+        setIsRecording(true);
+        console.log('Native recording started');
+      }
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      Alert.alert('Error', 'Failed to start recording. Please try again.');
+    }
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    try {
+      setIsRecording(false);
+      setIsTranscribing(true);
+      
+      let audioBlob: Blob;
+      let fileName: string;
+      let mimeType: string;
+      
+      if (Platform.OS === 'web') {
+        const mediaRecorder = mediaRecorderRef.current;
+        if (!mediaRecorder) {
+          setIsTranscribing(false);
+          return;
+        }
+        
+        await new Promise<void>((resolve) => {
+          mediaRecorder.onstop = () => resolve();
+          mediaRecorder.stop();
+        });
+        
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        fileName = 'recording.webm';
+        mimeType = 'audio/webm';
+        mediaRecorderRef.current = null;
+        console.log('Web recording stopped, blob size:', audioBlob.size);
+      } else {
+        const recording = recordingRef.current;
+        if (!recording) {
+          setIsTranscribing(false);
+          return;
+        }
+        
+        await recording.stopAndUnloadAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+        
+        const uri = recording.getURI();
+        if (!uri) {
+          setIsTranscribing(false);
+          return;
+        }
+        
+        const uriParts = uri.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        fileName = `recording.${fileType}`;
+        mimeType = `audio/${fileType}`;
+        
+        // For native, we need to create form data differently
+        const formData = new FormData();
+        formData.append('audio', {
+          uri,
+          name: fileName,
+          type: mimeType,
+        } as unknown as Blob);
+        
+        recordingRef.current = null;
+        console.log('Native recording stopped, uri:', uri);
+        
+        // Send to STT API
+        const response = await fetch('https://toolkit.rork.com/stt/transcribe/', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('Transcription failed');
+        }
+        
+        const result = await response.json();
+        console.log('Transcription result:', result);
+        
+        if (result.text) {
+          setInputText(prev => prev + (prev ? ' ' : '') + result.text);
+        }
+        
+        setIsTranscribing(false);
+        return;
+      }
+      
+      // Web path - send blob to STT API
+      const formData = new FormData();
+      formData.append('audio', audioBlob, fileName);
+      
+      const response = await fetch('https://toolkit.rork.com/stt/transcribe/', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Transcription failed');
+      }
+      
+      const result = await response.json();
+      console.log('Transcription result:', result);
+      
+      if (result.text) {
+        setInputText(prev => prev + (prev ? ' ' : '') + result.text);
+      }
+      
+      setIsTranscribing(false);
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      setIsTranscribing(false);
+      Alert.alert('Error', 'Failed to transcribe audio. Please try again.');
+    }
+  }, []);
+
+  const handleMicPress = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  }, [isRecording, startRecording, stopRecording]);
+
+  // Text-to-speech functions
+  const speakMessage = useCallback(async (messageId: string, text: string) => {
+    if (isSpeaking && speakingMessageId === messageId) {
+      Speech.stop();
+      setIsSpeaking(false);
+      setSpeakingMessageId(null);
+      return;
+    }
+    
+    if (isSpeaking) {
+      Speech.stop();
+    }
+    
+    setIsSpeaking(true);
+    setSpeakingMessageId(messageId);
+    
+    Speech.speak(text, {
+      onDone: () => {
+        setIsSpeaking(false);
+        setSpeakingMessageId(null);
+      },
+      onStopped: () => {
+        setIsSpeaking(false);
+        setSpeakingMessageId(null);
+      },
+      onError: () => {
+        setIsSpeaking(false);
+        setSpeakingMessageId(null);
+      },
+    });
+  }, [isSpeaking, speakingMessageId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (isSpeaking) {
+        Speech.stop();
+      }
+    };
+  }, [isSpeaking]);
+
   if (!coach) {
     return (
       <View style={styles.container}>
@@ -263,20 +476,35 @@ Personality & Approach:
       {!item.isUser && (
         <Image source={{ uri: coach.avatar }} style={styles.messageAvatar} />
       )}
-      <View
-        style={[
-          styles.messageBubble,
-          item.isUser ? styles.userBubble : styles.aiBubble,
-        ]}
-      >
-        <Text
+      <View style={styles.messageBubbleRow}>
+        <View
           style={[
-            styles.messageText,
-            item.isUser ? styles.userText : styles.aiText,
+            styles.messageBubble,
+            item.isUser ? styles.userBubble : styles.aiBubble,
           ]}
         >
-          {item.content}
-        </Text>
+          <Text
+            style={[
+              styles.messageText,
+              item.isUser ? styles.userText : styles.aiText,
+            ]}
+          >
+            {item.content}
+          </Text>
+        </View>
+        {!item.isUser && !item.isStreaming && (
+          <TouchableOpacity
+            style={styles.speakButton}
+            onPress={() => speakMessage(item.id, item.content)}
+            activeOpacity={0.7}
+          >
+            {isSpeaking && speakingMessageId === item.id ? (
+              <Square color={coach.color} size={16} fill={coach.color} />
+            ) : (
+              <Volume2 color={Colors.textSecondary} size={16} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -347,14 +575,32 @@ Personality & Approach:
 
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
         <View style={styles.inputWrapper}>
+          <TouchableOpacity
+            style={[
+              styles.micButton,
+              isRecording && styles.micButtonRecording,
+            ]}
+            onPress={handleMicPress}
+            disabled={isTranscribing || isLoading}
+            activeOpacity={0.7}
+          >
+            {isTranscribing ? (
+              <ActivityIndicator size="small" color={coach.color} />
+            ) : isRecording ? (
+              <Square color={Colors.white} size={18} fill={Colors.white} />
+            ) : (
+              <Mic color={Colors.textSecondary} size={20} />
+            )}
+          </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder="Type your message..."
-            placeholderTextColor={Colors.textMuted}
+            placeholder={isRecording ? "Recording..." : "Type your message..."}
+            placeholderTextColor={isRecording ? coach.color : Colors.textMuted}
             value={inputText}
             onChangeText={setInputText}
             multiline
             maxLength={500}
+            editable={!isRecording}
           />
           <TouchableOpacity
             style={[
@@ -362,7 +608,7 @@ Personality & Approach:
               inputText.trim() && !isLoading && { backgroundColor: coach.color },
             ]}
             onPress={() => handleSendMessage(inputText)}
-            disabled={!inputText.trim() || isLoading}
+            disabled={!inputText.trim() || isLoading || isRecording}
             activeOpacity={0.8}
           >
             {isLoading ? (
@@ -561,7 +807,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     backgroundColor: Colors.white,
     borderRadius: 24,
-    paddingLeft: 18,
+    paddingLeft: 6,
     paddingRight: 6,
     paddingVertical: 6,
     shadowColor: Colors.shadow,
@@ -576,6 +822,18 @@ const styles = StyleSheet.create({
     color: Colors.text,
     maxHeight: 100,
     paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  micButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.borderLight,
+  },
+  micButtonRecording: {
+    backgroundColor: "#EF4444",
   },
   sendButton: {
     width: 42,
@@ -677,5 +935,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginLeft: 8,
+  },
+  messageBubbleRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    maxWidth: "80%",
+  },
+  speakButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 6,
+    backgroundColor: Colors.borderLight,
   },
 });
