@@ -5,6 +5,7 @@ import { Platform, TouchableOpacity, View, findNodeHandle, UIManager, Dimensions
 
 import Colors from "@/constants/colors";
 import SpotlightOverlay from "@/components/onboarding/SpotlightOverlay";
+import { onboardingStorage } from "@/app/onboarding/storage";
 import * as Haptics from "expo-haptics";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -12,24 +13,32 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function TabLayout() {
   const router = useRouter();
   const [tutorialActive, setTutorialActive] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('(library)');
   const [spotlightPosition, setSpotlightPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const libraryTabRef = useRef<View>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Start tutorial after layout is ready
+  // Check for tutorial mode from AsyncStorage
   useEffect(() => {
-    const timer = setTimeout(() => {
-      // Check if we should show tutorial (this would typically come from onboarding context)
-      // For now, we'll just demonstrate the spotlight functionality
-      // In real implementation, this would check if we're in tutorial mode from onboarding step 3
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    const checkTutorialMode = async () => {
+      const isActive = await onboardingStorage.isTutorialActive();
+      if (isActive) {
+        setTutorialActive(true);
+        // Delay measurement to ensure layout is complete
+        setTimeout(() => {
+          measureLibraryTab();
+        }, 500);
+      }
+    };
+    
+    checkTutorialMode();
   }, []);
 
-  // Pulse animation for tutorial highlight
+  // Pulse animation for tutorial highlight - only when Library tab is focused
+  const shouldPulse = tutorialActive && activeTab === '(library)';
+  
   useEffect(() => {
-    if (tutorialActive) {
+    if (shouldPulse) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -47,7 +56,7 @@ export default function TabLayout() {
     } else {
       pulseAnim.setValue(1);
     }
-  }, [tutorialActive, pulseAnim]);
+  }, [shouldPulse, pulseAnim]);
 
   const measureLibraryTab = () => {
     if (libraryTabRef.current) {
@@ -65,11 +74,16 @@ export default function TabLayout() {
     }
   };
 
-  const handleLibraryPress = () => {
+  const handleLibraryPress = async () => {
     if (tutorialActive) {
       // Complete tutorial step
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setTutorialActive(false);
+      
+      // Mark tutorial as complete in storage
+      await onboardingStorage.setTutorialComplete(true);
+      
+      // Navigate back to onboarding
+      router.push('/onboarding' as any);
     }
   };
 
@@ -97,13 +111,13 @@ export default function TabLayout() {
           name="(library)"
           options={{
             title: "Library",
-            tabBarIcon: ({ color, size, focused }) => (
+            tabBarIcon: ({ color, size }) => (
               <Animated.View
                 ref={libraryTabRef}
                 onLayout={measureLibraryTab}
                 style={[
-                  tutorialActive && focused && styles.tutorialHighlight,
-                  tutorialActive && focused && { transform: [{ scale: pulseAnim }] },
+                  tutorialActive && activeTab === '(library)' && styles.tutorialHighlight,
+                  { transform: [{ scale: pulseAnim }] },
                 ]}
               >
                 <BookOpen color={color} size={size} />
@@ -113,6 +127,9 @@ export default function TabLayout() {
           listeners={{
             tabPress: () => {
               handleLibraryPress();
+            },
+            focus: () => {
+              setActiveTab('(library)');
             },
           }}
         />
@@ -139,12 +156,18 @@ export default function TabLayout() {
             },
             tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
           }}
+          listeners={{
+            focus: () => {
+              setActiveTab('saved');
+            },
+          }}
         />
       </Tabs>
 
-      {/* Tutorial Overlay */}
-      {tutorialActive && (
+      {/* Tutorial Overlay - only show when Library tab is focused */}
+      {tutorialActive && activeTab === '(library)' && spotlightPosition.width > 0 && (
         <SpotlightOverlay
+          isVisible={true}
           target={spotlightPosition}
           tooltip="Tap the Library tab to explore your coaches"
           onComplete={() => setTutorialActive(false)}

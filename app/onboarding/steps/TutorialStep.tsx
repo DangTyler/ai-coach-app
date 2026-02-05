@@ -4,7 +4,7 @@ import { BookOpen, ArrowRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
-import { useTutorial } from '../tutorial-context';
+import { onboardingStorage } from '../storage';
 import ProgressBar from '@/components/onboarding/ProgressBar';
 import XPAnimation from '@/components/onboarding/XPAnimation';
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
@@ -12,7 +12,6 @@ import Colors from '@/constants/colors';
 
 export default function TutorialStep() {
   const { nextStep, currentStep, totalSteps, addXp } = useOnboarding();
-  const { startTutorial } = useTutorial();
   const router = useRouter();
   
   const [showXp, setShowXp] = React.useState(false);
@@ -23,6 +22,34 @@ export default function TutorialStep() {
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
+    // Check if we're returning from completed tutorial
+    const checkTutorialCompletion = async () => {
+      const isComplete = await onboardingStorage.isTutorialComplete();
+      if (isComplete) {
+        // Tutorial was completed in TabLayout
+        await onboardingStorage.clearTutorialFlags();
+        
+        // Show celebration
+        setShowConfetti(true);
+        setShowXp(true);
+        addXp(15);
+        
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        
+        setTimeout(() => {
+          setShowXp(false);
+        }, 1500);
+        
+        setTimeout(() => {
+          setShowConfetti(false);
+          nextStep();
+        }, 2000);
+      }
+    };
+    
+    checkTutorialCompletion();
+    
+    // Entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -35,25 +62,18 @@ export default function TutorialStep() {
         friction: 8,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim]);
+  }, [fadeAnim, slideAnim, addXp, nextStep]);
 
-  const handleStartTutorial = () => {
+  const handleStartTutorial = async () => {
     setTutorialStarted(true);
     
-    // Navigate to main app with Library tab
-    // The Library tab layout will detect tutorial mode and show spotlight
-    router.push('/(tabs)/(library)');
+    // Store tutorial flag so TabLayout knows to show spotlight
+    await onboardingStorage.setTutorialActive(true);
+    await onboardingStorage.setStep(3); // Save current step
     
-    // After a short delay, activate the tutorial spotlight
-    setTimeout(() => {
-      // Target position for Library tab (approximate - bottom center)
-      startTutorial('library', {
-        x: 80, // Approximate position for Library tab
-        y: 650, // Will be calculated based on actual screen
-        width: 60,
-        height: 50,
-      }, 'Tap the Library tab to explore your coaches');
-    }, 500);
+    // Navigate to main app with Library tab
+    // The Library tab layout will detect tutorial mode from AsyncStorage
+    router.push('/(tabs)/(library)' as any);
   };
 
   const handleSimulateTap = () => {

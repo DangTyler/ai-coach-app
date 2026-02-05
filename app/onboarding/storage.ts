@@ -4,6 +4,8 @@ const STORAGE_KEYS = {
   ONBOARDING_COMPLETE: '@onboarding_complete',
   ONBOARDING_STEP: '@onboarding_step',
   ONBOARDING_DATA: '@onboarding_data',
+  ONBOARDING_TUTORIAL_ACTIVE: '@onboarding_tutorial_active',
+  ONBOARDING_TUTORIAL_COMPLETE: '@onboarding_tutorial_complete',
 };
 
 export interface OnboardingData {
@@ -60,6 +62,42 @@ export const onboardingStorage = {
       STORAGE_KEYS.ONBOARDING_COMPLETE,
       STORAGE_KEYS.ONBOARDING_STEP,
       STORAGE_KEYS.ONBOARDING_DATA,
+      STORAGE_KEYS.ONBOARDING_TUTORIAL_ACTIVE,
+      STORAGE_KEYS.ONBOARDING_TUTORIAL_COMPLETE,
+    ]);
+  },
+
+  // Tutorial-related methods
+  async setTutorialActive(active: boolean): Promise<void> {
+    await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_TUTORIAL_ACTIVE, active ? 'true' : 'false');
+  },
+
+  async isTutorialActive(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_TUTORIAL_ACTIVE);
+      return value === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  async setTutorialComplete(complete: boolean): Promise<void> {
+    await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_TUTORIAL_COMPLETE, complete ? 'true' : 'false');
+  },
+
+  async isTutorialComplete(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_TUTORIAL_COMPLETE);
+      return value === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  async clearTutorialFlags(): Promise<void> {
+    await AsyncStorage.multiRemove([
+      STORAGE_KEYS.ONBOARDING_TUTORIAL_ACTIVE,
+      STORAGE_KEYS.ONBOARDING_TUTORIAL_COMPLETE,
     ]);
   },
 };
