@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, Dimensions } from 'react-native';
+import { Animated, StyleSheet, View, Dimensions, Platform } from 'react-native';
 import LottieView from 'lottie-react-native';
 
 interface ConfettiEffectProps {
@@ -70,6 +70,29 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
 
   if (!trigger) return null;
 
+  // LottieView uses findNodeHandle which is not supported on web
+  if (Platform.OS === 'web') {
+    return (
+      <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
+        <View style={styles.webConfetti}>
+          {Array.from({ length: 20 }).map((_, i) => (
+            <Animated.View
+              key={i}
+              style={[
+                styles.confettiPiece,
+                {
+                  left: `${Math.random() * 100}%`,
+                  backgroundColor: ['#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181'][i % 5],
+                  transform: [{ rotate: `${Math.random() * 360}deg` }],
+                },
+              ]}
+            />
+          ))}
+        </View>
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       <LottieView
@@ -106,5 +129,16 @@ const styles = StyleSheet.create({
   large: {
     width: width * 1.2,
     height: height * 1.2,
+  },
+  webConfetti: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  confettiPiece: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    top: '30%',
   },
 });
