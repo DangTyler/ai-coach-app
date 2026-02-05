@@ -4,14 +4,12 @@ import { BookOpen, ArrowRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import XPAnimation from '@/components/onboarding/XPAnimation';
+
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import Colors from '@/constants/colors';
 
 export default function TutorialStep() {
-  const { nextStep, currentStep, totalSteps, addXp } = useOnboarding();
-  
-  const [showXp, setShowXp] = React.useState(false);
+  const { nextStep, currentStep, totalSteps } = useOnboarding();
   const [showConfetti, setShowConfetti] = React.useState(false);
   const [tutorialPhase, setTutorialPhase] = React.useState<'intro' | 'highlight' | 'complete'>('intro');
   
@@ -42,14 +40,8 @@ export default function TutorialStep() {
   const handleTapLibrary = () => {
     setTutorialPhase('complete');
     setShowConfetti(true);
-    setShowXp(true);
-    addXp(15);
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
-    setTimeout(() => {
-      setShowXp(false);
-    }, 1500);
     
     setTimeout(() => {
       setShowConfetti(false);
@@ -126,12 +118,6 @@ export default function TutorialStep() {
             <Text style={styles.completedText}>Great job! 🎉</Text>
           </View>
         )}
-
-        <XPAnimation 
-          amount={15} 
-          trigger={showXp} 
-          y={50}
-        />
       </Animated.View>
     </View>
   );
