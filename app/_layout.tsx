@@ -41,17 +41,29 @@ function RootLayoutWithOnboarding() {
   }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      const inOnboarding = segments[0] === 'onboarding';
-      
-      if (!isOnboardingComplete && !inOnboarding) {
-        // Redirect to onboarding if not complete
-        router.replace('/onboarding' as any);
-      } else if (isOnboardingComplete && inOnboarding) {
-        // Redirect to main app if onboarding is complete
-        router.replace('/(tabs)' as any);
+    const handleNavigation = async () => {
+      if (!isLoading) {
+        const inOnboarding = segments[0] === 'onboarding';
+        
+        // Re-check storage in case it was updated
+        const completed = await onboardingStorage.isComplete();
+        
+        if (completed !== isOnboardingComplete) {
+          setIsOnboardingComplete(completed);
+          return; // Let the next effect run handle navigation
+        }
+        
+        if (!completed && !inOnboarding) {
+          // Redirect to onboarding if not complete
+          router.replace('/onboarding' as any);
+        } else if (completed && inOnboarding) {
+          // Redirect to main app if onboarding is complete
+          router.replace('/(tabs)' as any);
+        }
       }
-    }
+    };
+    
+    handleNavigation();
   }, [isLoading, isOnboardingComplete, segments]);
 
   const checkOnboardingStatus = async () => {
