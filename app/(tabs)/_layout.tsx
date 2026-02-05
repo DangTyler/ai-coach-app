@@ -1,7 +1,7 @@
 import { Tabs, useRouter } from "expo-router";
 import { BookOpen, MessageSquare, Settings } from "lucide-react-native";
 import React, { useRef, useEffect, useState } from "react";
-import { Platform, TouchableOpacity, View, findNodeHandle, UIManager, Dimensions, StyleSheet, Animated } from "react-native";
+import { Platform, TouchableOpacity, View, findNodeHandle, UIManager, Dimensions, StyleSheet } from "react-native";
 
 import Colors from "@/constants/colors";
 import SpotlightOverlay from "@/components/onboarding/SpotlightOverlay";
@@ -16,7 +16,6 @@ export default function TabLayout() {
   const [activeTab, setActiveTab] = useState<string>('(library)');
   const [spotlightPosition, setSpotlightPosition] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const libraryTabRef = useRef<View>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Check for tutorial mode from AsyncStorage
   useEffect(() => {
@@ -33,30 +32,6 @@ export default function TabLayout() {
     
     checkTutorialMode();
   }, []);
-
-  // Pulse animation for tutorial highlight - only when Library tab is focused
-  const shouldPulse = tutorialActive && activeTab === '(library)';
-  
-  useEffect(() => {
-    if (shouldPulse) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [shouldPulse, pulseAnim]);
 
   const measureLibraryTab = () => {
     if (libraryTabRef.current) {
@@ -112,16 +87,15 @@ export default function TabLayout() {
           options={{
             title: "Library",
             tabBarIcon: ({ color, size }) => (
-              <Animated.View
+              <View
                 ref={libraryTabRef}
                 onLayout={measureLibraryTab}
                 style={[
                   tutorialActive && activeTab === '(library)' && styles.tutorialHighlight,
-                  { transform: [{ scale: pulseAnim }] },
                 ]}
               >
                 <BookOpen color={color} size={size} />
-              </Animated.View>
+              </View>
             ),
           }}
           listeners={{
