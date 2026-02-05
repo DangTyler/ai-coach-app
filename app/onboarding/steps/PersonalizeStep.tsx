@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { Sparkles, MessageSquare, Trophy, Target } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
@@ -9,7 +9,7 @@ import SparkleEffect from '@/components/onboarding/SparkleEffect';
 import Colors from '@/constants/colors';
 
 export default function PersonalizeStep() {
-  const { nextStep, currentStep, totalSteps, data, addXp, triggerConfetti } = useOnboarding();
+  const { nextStep, currentStep, totalSteps, data, triggerConfetti } = useOnboarding();
   
   const [showSparkles, setShowSparkles] = React.useState(false);
   
@@ -44,16 +44,16 @@ export default function PersonalizeStep() {
       setShowSparkles(true);
       triggerConfetti('medium');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      // Hide sparkles after a moment
+      setTimeout(() => setShowSparkles(false), 2000);
     }, 500);
+  }, [fadeAnims, slideAnims, triggerConfetti]);
 
-    
-
-    // Auto advance
-    setTimeout(() => {
-      setShowSparkles(false);
-      nextStep();
-    }, 3500);
-  }, [fadeAnims, slideAnims, addXp, nextStep, triggerConfetti]);
+  const handleContinue = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    nextStep();
+  };
 
   const features = [
     { icon: MessageSquare, label: 'AI Coaches', color: Colors.accent },
@@ -148,6 +148,14 @@ export default function PersonalizeStep() {
             <Text style={styles.pathText}>Your learning path awaits!</Text>
           </Animated.View>
         </View>
+
+        <TouchableOpacity
+          style={styles.continueButton}
+          onPress={handleContinue}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.continueButtonText}>Continue</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -267,5 +275,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     fontWeight: '500',
+  },
+  continueButton: {
+    backgroundColor: Colors.navy,
+    marginTop: 24,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    shadowColor: Colors.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  continueButtonText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '600',
   },
 });

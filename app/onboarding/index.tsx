@@ -4,7 +4,7 @@ import { useOnboarding } from './context';
 import WelcomeStep from './steps/WelcomeStep';
 import ProfileStep from './steps/ProfileStep';
 import TutorialStep from './steps/TutorialStep';
-import AchievementStep from './steps/AchievementStep';
+
 import PersonalizeStep from './steps/PersonalizeStep';
 import CompleteStep from './steps/CompleteStep';
 import Colors from '@/constants/colors';
@@ -21,10 +21,8 @@ function StepRenderer({ step }: { step: number }) {
     case 3:
       return <TutorialStep />;
     case 4:
-      return <AchievementStep />;
-    case 5:
       return <PersonalizeStep />;
-    case 6:
+    case 5:
       return <CompleteStep />;
     default:
       return <WelcomeStep />;

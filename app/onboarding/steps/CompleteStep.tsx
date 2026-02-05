@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Rocket, Award, Flame, Sparkles } from 'lucide-react-native';
+import { Rocket, Award, Sparkles } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
@@ -18,7 +18,7 @@ export default function CompleteStep() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
-  const flamePulse = useRef(new Animated.Value(1)).current;
+
 
   useEffect(() => {
     // Celebration haptics
@@ -50,22 +50,7 @@ export default function CompleteStep() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }, 1500);
 
-    // Flame pulse animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(flamePulse, {
-          toValue: 1.2,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(flamePulse, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [fadeAnim, slideAnim, flamePulse]);
+  }, [fadeAnim, slideAnim]);
 
   const handleStart = async () => {
     // Button bounce
@@ -140,18 +125,6 @@ export default function CompleteStep() {
                 <Award color={Colors.accent} size={24} />
               </View>
               <Text style={styles.badgeText}>Profile Set</Text>
-            </View>
-
-            <View style={styles.badgeItem}>
-              <Animated.View 
-                style={[
-                  styles.badgeIcon,
-                  { transform: [{ scale: flamePulse }] },
-                ]}
-              >
-                <Flame color={Colors.accent} size={24} />
-              </Animated.View>
-              <Text style={styles.badgeText}>Day 1 Streak</Text>
             </View>
           </View>
         </View>
