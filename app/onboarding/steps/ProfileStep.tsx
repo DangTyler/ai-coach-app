@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated, ScrollView } from 'react-native';
 import { User } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
@@ -8,23 +8,25 @@ import ProgressBar from '@/components/onboarding/ProgressBar';
 import CheckmarkAnimation from '@/components/onboarding/CheckmarkAnimation';
 import Colors from '@/constants/colors';
 
-const GOALS = [
-  { id: 'learn', label: 'Learn', icon: '📚', description: 'Master new skills' },
-  { id: 'improve', label: 'Improve', icon: '📈', description: 'Enhance existing abilities' },
-  { id: 'explore', icon: '🔍', label: 'Explore', description: 'Discover new possibilities' },
+const HELP_TOPICS = [
+  { id: 'career', label: 'Career', icon: '💼' },
+  { id: 'wellness', label: 'Wellness', icon: '🧘' },
+  { id: 'productivity', label: 'Productivity', icon: '⚡' },
+  { id: 'finance', label: 'Finance', icon: '💰' },
+  { id: 'relationships', label: 'Relationships', icon: '💬' },
+  { id: 'creativity', label: 'Creativity', icon: '🎨' },
 ] as const;
 
-type GoalId = typeof GOALS[number]['id'];
+type TopicId = typeof HELP_TOPICS[number]['id'];
 
 export default function ProfileStep() {
   const { nextStep, currentStep, totalSteps, updateData, triggerConfetti } = useOnboarding();
   
   const [name, setName] = useState('');
-  const [selectedGoal, setSelectedGoal] = useState<GoalId | null>(null);
+  const [selectedTopics, setSelectedTopics] = useState<TopicId[]>([]);
   const [hasTriggeredNameConfetti, setHasTriggeredNameConfetti] = useState(false);
-  const [hasTriggeredGoalConfetti, setHasTriggeredGoalConfetti] = useState(false);
+  const [hasTriggeredTopicConfetti, setHasTriggeredTopicConfetti] = useState(false);
   const [showNameCheck, setShowNameCheck] = useState(false);
-  const [showGoalCheck, setShowGoalCheck] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -61,105 +63,114 @@ export default function ProfileStep() {
     }
   };
 
-  const handleGoalSelect = (goalId: GoalId) => {
-    setSelectedGoal(goalId);
-    setShowGoalCheck(true);
-    if (!hasTriggeredGoalConfetti) {
-      setHasTriggeredGoalConfetti(true);
-      triggerConfetti('small');
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateData({ goal: goalId });
-
-    setTimeout(() => {
-      setShowGoalCheck(false);
-    }, 2500);
+  const handleTopicToggle = (topicId: TopicId) => {
+    setSelectedTopics(prev => {
+      const isSelected = prev.includes(topicId);
+      const newTopics = isSelected 
+        ? prev.filter(t => t !== topicId)
+        : [...prev, topicId];
+      
+      if (!isSelected && !hasTriggeredTopicConfetti) {
+        setHasTriggeredTopicConfetti(true);
+        triggerConfetti('small');
+      }
+      
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      const topicLabels = newTopics.map(t => 
+        HELP_TOPICS.find(h => h.id === t)?.label
+      ).filter(Boolean).join(', ');
+      updateData({ helpTopics: topicLabels });
+      
+      return newTopics;
+    });
   };
 
   const handleContinue = () => {
-    if (name && selectedGoal) {
+    if (name && selectedTopics.length > 0) {
       updateData({ name });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       nextStep();
     }
   };
 
-  const canContinue = name.length > 0 && selectedGoal !== null;
+  const canContinue = name.length > 0 && selectedTopics.length > 0;
 
   return (
     <View style={styles.container}>
       <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Let's get to know you</Text>
-        <Text style={styles.subtitle}>Personalize your coaching experience</Text>
+        <Animated.View
+          style={[
+            styles.content,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+            },
+          ]}
+        >
+          <Text style={styles.title}>Let&apos;s get to know you</Text>
+          <Text style={styles.subtitle}>Let&apos;s personalize your coaching</Text>
 
-        {/* Name Input */}
-        <View style={styles.section}>
-          <Text style={styles.label}>What's your name?</Text>
-          <View style={styles.inputContainer}>
-            <User color={Colors.textMuted} size={20} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your name"
-              placeholderTextColor={Colors.textMuted}
-              value={name}
-              onChangeText={handleNameChange}
-              onBlur={handleNameBlur}
-              autoCapitalize="words"
-            />
-            <View style={styles.checkContainer}>
-              <CheckmarkAnimation 
-                trigger={showNameCheck} 
-                size={28}
+          {/* Name Input */}
+          <View style={styles.section}>
+            <Text style={styles.label}>What&apos;s your name?</Text>
+            <View style={styles.inputContainer}>
+              <User color={Colors.textMuted} size={20} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your name"
+                placeholderTextColor={Colors.textMuted}
+                value={name}
+                onChangeText={handleNameChange}
+                onBlur={handleNameBlur}
+                autoCapitalize="words"
               />
+              <View style={styles.checkContainer}>
+                <CheckmarkAnimation 
+                  trigger={showNameCheck} 
+                  size={28}
+                />
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Goal Selection */}
-        <View style={styles.section}>
-          <Text style={styles.label}>What's your goal?</Text>
-          <View style={styles.goalsContainer}>
-            {GOALS.map((goal) => (
-              <TouchableOpacity
-                key={goal.id}
-                style={[
-                  styles.goalCard,
-                  selectedGoal === goal.id && styles.goalCardActive,
-                ]}
-                onPress={() => handleGoalSelect(goal.id)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.goalIcon}>{goal.icon}</Text>
-                <Text style={[
-                  styles.goalLabel,
-                  selectedGoal === goal.id && styles.goalLabelActive,
-                ]}>
-                  {goal.label}
-                </Text>
-                <Text style={styles.goalDescription}>{goal.description}</Text>
-                {selectedGoal === goal.id && (
-                  <View style={styles.goalCheckContainer}>
-                    <CheckmarkAnimation 
-                      trigger={showGoalCheck} 
-                      size={24}
-                    />
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))}
+          {/* Help Topics Selection */}
+          <View style={styles.section}>
+            <Text style={styles.label}>What would you like help with?</Text>
+            <Text style={styles.labelHint}>Select all that apply</Text>
+            <View style={styles.topicsContainer}>
+              {HELP_TOPICS.map((topic) => {
+                const isSelected = selectedTopics.includes(topic.id);
+                return (
+                  <TouchableOpacity
+                    key={topic.id}
+                    style={[
+                      styles.topicChip,
+                      isSelected && styles.topicChipActive,
+                    ]}
+                    onPress={() => handleTopicToggle(topic.id)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.topicIcon}>{topic.icon}</Text>
+                    <Text style={[
+                      styles.topicLabel,
+                      isSelected && styles.topicLabelActive,
+                    ]}>
+                      {topic.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
 
       <TouchableOpacity
         style={[styles.button, !canContinue && styles.buttonDisabled]}
@@ -177,6 +188,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   content: {
     flex: 1,
@@ -200,6 +217,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: Colors.navy,
+    marginBottom: 4,
+  },
+  labelHint: {
+    fontSize: 13,
+    color: Colors.textSecondary,
     marginBottom: 12,
   },
   inputContainer: {
@@ -228,50 +250,41 @@ const styles = StyleSheet.create({
     right: 16,
     top: 12,
   },
-  goalsContainer: {
+  topicsContainer: {
     flexDirection: 'row',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  goalCard: {
-    flex: 1,
-    backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
+  topicChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: Colors.borderLight,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  goalCardActive: {
+  topicChipActive: {
     borderColor: Colors.accent,
     backgroundColor: Colors.accentLight,
   },
-  goalIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+  topicIcon: {
+    fontSize: 18,
+    marginRight: 8,
   },
-  goalLabel: {
-    fontSize: 14,
+  topicLabel: {
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.navy,
-    marginBottom: 4,
   },
-  goalLabelActive: {
+  topicLabelActive: {
     color: Colors.accent,
-  },
-  goalDescription: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  goalCheckContainer: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
   },
   button: {
     backgroundColor: Colors.navy,

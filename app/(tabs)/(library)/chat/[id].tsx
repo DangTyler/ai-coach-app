@@ -28,6 +28,7 @@ import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
 import { useCoaches } from "@/contexts/CoachContext";
 import { defaultContextCards, ContextCard } from "@/mocks/chats";
+import { onboardingStorage, UserContext } from "@/app/onboarding/storage";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -56,17 +57,46 @@ export default function ChatScreen() {
   const [showContext, setShowContext] = useState(false);
   const [contextCards, setContextCards] = useState<ContextCard[]>(defaultContextCards);
   const [hasUsedInitialPrompt, setHasUsedInitialPrompt] = useState(false);
+  const [userContext, setUserContext] = useState<UserContext | null>(null);
   const slideAnim = useRef(new Animated.Value(screenHeight)).current;
   const overlayAnim = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    const loadUserContext = async () => {
+      const context = await onboardingStorage.getUserContext();
+      if (context) {
+        setUserContext(context);
+      }
+    };
+    loadUserContext();
+  }, []);
 
   const systemPrompt = useMemo(() => {
     if (!coach) return "";
     
     const enabledCards = contextCards.filter(c => c.enabled && c.content.trim());
-    const userContextSection = enabledCards.length > 0
-      ? `\n\nThe user has shared the following about themselves:\n${enabledCards.map(c => `${c.title}: ${c.content}`).join('\n')}\n\nUse this information to personalize your responses, but don't explicitly reference these details unless relevant.`
-      : "";
+    let userContextSection = "";
+    
+    // Add stored user context from onboarding
+    if (userContext?.name || userContext?.helpTopics) {
+      userContextSection += "\n\nAbout the user:";
+      if (userContext.name) {
+        userContextSection += `\n- Name: ${userContext.name}`;
+      }
+      if (userContext.helpTopics) {
+        userContextSection += `\n- Interested in help with: ${userContext.helpTopics}`;
+      }
+    }
+    
+    // Add context cards
+    if (enabledCards.length > 0) {
+      userContextSection += `\n\nAdditional context shared by the user:\n${enabledCards.map(c => `${c.title}: ${c.content}`).join('\n')}`;
+    }
+    
+    if (userContextSection) {
+      userContextSection += "\n\nUse this information to personalize your responses, but don't explicitly reference these details unless relevant.";
+    }
     
     const basePrompt = coach.systemPrompt || `You are ${coach.name}. ${coach.tagline}.
 
@@ -83,7 +113,7 @@ Personality & Approach:
 - Show personality - you have opinions and a unique perspective`;
     
     return `${basePrompt}${userContextSection}`;
-  }, [coach, contextCards]);
+  }, [coach, contextCards, userContext]);
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status, setMessages } = useRorkAgent({
     tools: {} as Record<string, never>,

@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight } from "lucide-react-native";
-import React, { useState } from "react";
+import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight, User, Sparkles } from "lucide-react-native";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,11 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from 'expo-haptics';
 
 import Colors from "@/constants/colors";
 import { onboardingStorage } from "@/app/onboarding/storage";
@@ -18,6 +21,42 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [editingName, setEditingName] = useState('');
+  const [editingTopics, setEditingTopics] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    loadUserContext();
+  }, []);
+
+  const loadUserContext = async () => {
+    const context = await onboardingStorage.getUserContext();
+    if (context) {
+      setEditingName(context.name);
+      setEditingTopics(context.helpTopics);
+    }
+  };
+
+  const handleNameChange = (text: string) => {
+    setEditingName(text);
+    setHasChanges(true);
+  };
+
+  const handleTopicsChange = (text: string) => {
+    setEditingTopics(text);
+    setHasChanges(true);
+  };
+
+  const handleSaveContext = async () => {
+    await onboardingStorage.saveUserContext({
+      name: editingName,
+      helpTopics: editingTopics,
+    });
+    console.log('[Settings] User context saved:', { name: editingName, helpTopics: editingTopics });
+    setHasChanges(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('Saved', 'Your profile has been updated!');
+  };
 
   const toggleDarkMode = (value: boolean) => {
     setIsDarkMode(value);
@@ -85,6 +124,52 @@ export default function SettingsScreen() {
                 ios_backgroundColor={Colors.border}
               />
             </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Profile</Text>
+          <View style={styles.card}>
+            <View style={styles.contextField}>
+              <View style={styles.contextLabelRow}>
+                <User color={Colors.accent} size={18} />
+                <Text style={styles.contextLabel}>Name</Text>
+              </View>
+              <TextInput
+                style={styles.contextInput}
+                value={editingName}
+                onChangeText={handleNameChange}
+                placeholder="Your name"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.contextField}>
+              <View style={styles.contextLabelRow}>
+                <Sparkles color={Colors.accent} size={18} />
+                <Text style={styles.contextLabel}>Help Topics</Text>
+              </View>
+              <TextInput
+                style={[styles.contextInput, styles.contextInputMulti]}
+                value={editingTopics}
+                onChangeText={handleTopicsChange}
+                placeholder="What do you want help with?"
+                placeholderTextColor={Colors.textMuted}
+                multiline
+              />
+              <Text style={styles.contextHint}>
+                Coaches will use this to personalize your conversations
+              </Text>
+            </View>
+            {hasChanges && (
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveContext}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -250,5 +335,49 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.borderLight,
     marginHorizontal: 16,
+  },
+  contextField: {
+    padding: 16,
+  },
+  contextLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  contextLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.navy,
+    marginLeft: 8,
+  },
+  contextInput: {
+    fontSize: 16,
+    color: Colors.text,
+    backgroundColor: Colors.cardAlt,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  contextInputMulti: {
+    minHeight: 60,
+    textAlignVertical: 'top',
+  },
+  contextHint: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 6,
+  },
+  saveButton: {
+    backgroundColor: Colors.accent,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

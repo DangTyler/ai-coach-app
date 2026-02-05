@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   ONBOARDING_DATA: '@onboarding_data',
   ONBOARDING_TUTORIAL_ACTIVE: '@onboarding_tutorial_active',
   ONBOARDING_TUTORIAL_COMPLETE: '@onboarding_tutorial_complete',
+  USER_CONTEXT: '@user_context',
 };
 
 export interface OnboardingData {
@@ -13,6 +14,13 @@ export interface OnboardingData {
   goal?: 'learn' | 'improve' | 'explore';
   practiceTime?: 'morning' | 'afternoon' | 'evening';
   xp?: number;
+  helpTopics?: string;
+  firstChatComplete?: boolean;
+}
+
+export interface UserContext {
+  name: string;
+  helpTopics: string;
 }
 
 export const onboardingStorage = {
@@ -99,5 +107,24 @@ export const onboardingStorage = {
       STORAGE_KEYS.ONBOARDING_TUTORIAL_ACTIVE,
       STORAGE_KEYS.ONBOARDING_TUTORIAL_COMPLETE,
     ]);
+  },
+
+  async getUserContext(): Promise<UserContext | null> {
+    try {
+      const value = await AsyncStorage.getItem(STORAGE_KEYS.USER_CONTEXT);
+      return value ? JSON.parse(value) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  async saveUserContext(context: UserContext): Promise<void> {
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_CONTEXT, JSON.stringify(context));
+  },
+
+  async updateUserContext(updates: Partial<UserContext>): Promise<void> {
+    const current = await this.getUserContext();
+    const updated = { ...current, ...updates } as UserContext;
+    await this.saveUserContext(updated);
   },
 };
