@@ -1,10 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { BookOpen, ArrowRight } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
-import { onboardingStorage } from '../storage';
 import ProgressBar from '@/components/onboarding/ProgressBar';
 import XPAnimation from '@/components/onboarding/XPAnimation';
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
@@ -12,11 +10,10 @@ import Colors from '@/constants/colors';
 
 export default function TutorialStep() {
   const { nextStep, currentStep, totalSteps, addXp } = useOnboarding();
-  const router = useRouter();
   
   const [showXp, setShowXp] = React.useState(false);
   const [showConfetti, setShowConfetti] = React.useState(false);
-  const [tutorialStarted, setTutorialStarted] = React.useState(false);
+  const [tutorialPhase, setTutorialPhase] = React.useState<'intro' | 'highlight' | 'complete'>('intro');
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -37,20 +34,13 @@ export default function TutorialStep() {
     ]).start();
   }, [fadeAnim, slideAnim]);
 
-  const handleStartTutorial = async () => {
-    setTutorialStarted(true);
-    
-    // Store tutorial flag so TabLayout knows to show spotlight
-    await onboardingStorage.setTutorialActive(true);
-    await onboardingStorage.setStep(3); // Save current step
-    
-    // Navigate to main app with Library tab
-    // The Library tab layout will detect tutorial mode from AsyncStorage
-    router.replace('/(tabs)/(library)' as any);
+  const handleStartTutorial = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTutorialPhase('highlight');
   };
 
-  const handleSimulateTap = () => {
-    // For demo purposes, simulate the Library tab tap
+  const handleTapLibrary = () => {
+    setTutorialPhase('complete');
     setShowConfetti(true);
     setShowXp(true);
     addXp(15);
@@ -94,7 +84,7 @@ export default function TutorialStep() {
           Tap the Library tab to discover AI coaches ready to help you achieve your goals
         </Text>
 
-        {!tutorialStarted ? (
+        {tutorialPhase === 'intro' && (
           <TouchableOpacity
             style={styles.startButton}
             onPress={handleStartTutorial}
@@ -103,20 +93,37 @@ export default function TutorialStep() {
             <Text style={styles.startButtonText}>Start Tutorial</Text>
             <ArrowRight color={Colors.white} size={20} style={styles.buttonIcon} />
           </TouchableOpacity>
-        ) : (
+        )}
+        
+        {tutorialPhase === 'highlight' && (
           <View style={styles.simulationContainer}>
+            <View style={styles.mockTabBar}>
+              <TouchableOpacity
+                style={styles.mockTab}
+                onPress={handleTapLibrary}
+                activeOpacity={0.7}
+              >
+                <View style={styles.highlightedTab}>
+                  <BookOpen color={Colors.accent} size={24} />
+                  <Text style={styles.mockTabTextActive}>Library</Text>
+                </View>
+              </TouchableOpacity>
+              <View style={styles.mockTab}>
+                <View style={styles.normalTab}>
+                  <BookOpen color={Colors.textMuted} size={24} />
+                  <Text style={styles.mockTabText}>Saved</Text>
+                </View>
+              </View>
+            </View>
             <Text style={styles.simulationText}>
-              The Library tab is now highlighted!
+              Tap the Library tab above!
             </Text>
-            <TouchableOpacity
-              style={styles.simulateButton}
-              onPress={handleSimulateTap}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.simulateButtonText}>
-                Tap Library Tab
-              </Text>
-            </TouchableOpacity>
+          </View>
+        )}
+        
+        {tutorialPhase === 'complete' && (
+          <View style={styles.simulationContainer}>
+            <Text style={styles.completedText}>Great job! 🎉</Text>
           </View>
         )}
 
@@ -195,20 +202,52 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  simulateButton: {
-    backgroundColor: Colors.accent,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+  mockTabBar: {
+    flexDirection: 'row',
+    backgroundColor: Colors.white,
     borderRadius: 16,
-    shadowColor: Colors.accent,
+    padding: 8,
+    marginBottom: 24,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
     elevation: 4,
   },
-  simulateButtonText: {
-    color: Colors.white,
-    fontSize: 16,
+  mockTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  highlightedTab: {
+    alignItems: 'center',
+    backgroundColor: Colors.accentLight,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.accent,
+  },
+  normalTab: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  mockTabTextActive: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.accent,
+    marginTop: 4,
+  },
+  mockTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  completedText: {
+    fontSize: 24,
     fontWeight: '700',
+    color: Colors.navy,
   },
 });
