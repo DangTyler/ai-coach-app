@@ -4,7 +4,7 @@ import { Flame, Sun, Sunset, Moon } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import XPAnimation from '@/components/onboarding/XPAnimation';
+import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import SparkleEffect from '@/components/onboarding/SparkleEffect';
 import Colors from '@/constants/colors';
 
@@ -17,10 +17,10 @@ const TIMES = [
 type TimeId = typeof TIMES[number]['id'];
 
 export default function StreakStep() {
-  const { nextStep, currentStep, totalSteps, updateData, addXp } = useOnboarding();
+  const { nextStep, currentStep, totalSteps, updateData } = useOnboarding();
   
   const [selectedTime, setSelectedTime] = useState<TimeId | null>(null);
-  const [showXp, setShowXp] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [showSparkles, setShowSparkles] = useState(false);
   const [showFlame, setShowFlame] = useState(false);
   
@@ -64,16 +64,15 @@ export default function StreakStep() {
       friction: 6,
     }).start();
 
-    addXp(20);
-    setShowXp(true);
+    setShowConfetti(true);
     updateData({ practiceTime: timeId });
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     setTimeout(() => {
-      setShowXp(false);
+      setShowConfetti(false);
       setShowSparkles(false);
-    }, 1500);
+    }, 2500);
   };
 
   const handleContinue = () => {
@@ -179,10 +178,9 @@ export default function StreakStep() {
           })}
         </View>
 
-        <XPAnimation 
-          amount={20} 
-          trigger={showXp} 
-          y={80}
+        <ConfettiEffect 
+          trigger={showConfetti} 
+          intensity="medium"
         />
       </Animated.View>
 

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Animated } from 'react-native';
-import { User, Target } from 'lucide-react-native';
+import { User } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import XPAnimation from '@/components/onboarding/XPAnimation';
+import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import CheckmarkAnimation from '@/components/onboarding/CheckmarkAnimation';
 import Colors from '@/constants/colors';
 
@@ -17,12 +17,12 @@ const GOALS = [
 type GoalId = typeof GOALS[number]['id'];
 
 export default function ProfileStep() {
-  const { nextStep, currentStep, totalSteps, updateData, addXp } = useOnboarding();
+  const { nextStep, currentStep, totalSteps, updateData } = useOnboarding();
   
   const [name, setName] = useState('');
   const [selectedGoal, setSelectedGoal] = useState<GoalId | null>(null);
-  const [showNameXp, setShowNameXp] = useState(false);
-  const [showGoalXp, setShowGoalXp] = useState(false);
+  const [showNameConfetti, setShowNameConfetti] = useState(false);
+  const [showGoalConfetti, setShowGoalConfetti] = useState(false);
   const [showNameCheck, setShowNameCheck] = useState(false);
   const [showGoalCheck, setShowGoalCheck] = useState(false);
 
@@ -46,33 +46,31 @@ export default function ProfileStep() {
 
   const handleNameChange = (text: string) => {
     setName(text);
-    if (text.length === 1 && !showNameXp) {
+    if (text.length === 1 && !showNameConfetti) {
       // First character typed
-      setShowNameXp(true);
+      setShowNameConfetti(true);
       setShowNameCheck(true);
-      addXp(10);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
       // Reset animations
       setTimeout(() => {
-        setShowNameXp(false);
+        setShowNameConfetti(false);
         setShowNameCheck(false);
-      }, 1500);
+      }, 2500);
     }
   };
 
   const handleGoalSelect = (goalId: GoalId) => {
     setSelectedGoal(goalId);
-    setShowGoalXp(true);
+    setShowGoalConfetti(true);
     setShowGoalCheck(true);
-    addXp(10);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateData({ goal: goalId });
 
     setTimeout(() => {
-      setShowGoalXp(false);
+      setShowGoalConfetti(false);
       setShowGoalCheck(false);
-    }, 1500);
+    }, 2500);
   };
 
   const handleContinue = () => {
@@ -121,10 +119,9 @@ export default function ProfileStep() {
               />
             </View>
           </View>
-          <XPAnimation 
-            amount={10} 
-            trigger={showNameXp} 
-            y={-40}
+          <ConfettiEffect 
+            trigger={showNameConfetti} 
+            intensity="small"
           />
         </View>
 
@@ -161,10 +158,9 @@ export default function ProfileStep() {
               </TouchableOpacity>
             ))}
           </View>
-          <XPAnimation 
-            amount={10} 
-            trigger={showGoalXp} 
-            y={80}
+          <ConfettiEffect 
+            trigger={showGoalConfetti} 
+            intensity="small"
           />
         </View>
       </Animated.View>

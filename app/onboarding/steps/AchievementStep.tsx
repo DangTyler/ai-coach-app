@@ -4,14 +4,13 @@ import { Award } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import XPAnimation from '@/components/onboarding/XPAnimation';
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import Colors from '@/constants/colors';
 
 export default function AchievementStep() {
   const { nextStep, currentStep, totalSteps, addXp } = useOnboarding();
   
-  const [showXp, setShowXp] = React.useState(false);
+  
   const [showConfetti, setShowConfetti] = React.useState(true);
   
   const badgeScale = useRef(new Animated.Value(0)).current;
@@ -47,16 +46,12 @@ export default function AchievementStep() {
       }),
     ]).start();
 
-    // Add XP and show popup
-    setTimeout(() => {
-      addXp(50);
-      setShowXp(true);
-    }, 500);
+    
 
     // Auto advance after celebration
     setTimeout(() => {
       setShowConfetti(false);
-      setShowXp(false);
+      
       nextStep();
     }, 3500);
   }, [badgeScale, fadeAnim, slideAnim, addXp, nextStep]);
@@ -107,11 +102,7 @@ export default function AchievementStep() {
           </View>
         </View>
 
-        <XPAnimation 
-          amount={50} 
-          trigger={showXp} 
-          y={20}
-        />
+        
       </Animated.View>
     </View>
   );

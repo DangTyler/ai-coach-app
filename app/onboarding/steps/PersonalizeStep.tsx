@@ -4,14 +4,14 @@ import { Sparkles, MessageSquare, Trophy, Target } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import XPAnimation from '@/components/onboarding/XPAnimation';
+import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import SparkleEffect from '@/components/onboarding/SparkleEffect';
 import Colors from '@/constants/colors';
 
 export default function PersonalizeStep() {
   const { nextStep, currentStep, totalSteps, data, addXp } = useOnboarding();
   
-  const [showXp, setShowXp] = React.useState(false);
+  const [showConfetti, setShowConfetti] = React.useState(false);
   const [showSparkles, setShowSparkles] = React.useState(false);
   
   const fadeAnims = useRef(
@@ -43,14 +43,11 @@ export default function PersonalizeStep() {
     // Trigger XP and sparkles after animations
     setTimeout(() => {
       setShowSparkles(true);
-      addXp(25);
-      setShowXp(true);
+      setShowConfetti(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, 500);
 
-    setTimeout(() => {
-      setShowXp(false);
-    }, 2000);
+    
 
     // Auto advance
     setTimeout(() => {
@@ -153,10 +150,9 @@ export default function PersonalizeStep() {
           </Animated.View>
         </View>
 
-        <XPAnimation 
-          amount={25} 
-          trigger={showXp} 
-          y={50}
+        <ConfettiEffect 
+          trigger={showConfetti} 
+          intensity="medium"
         />
       </View>
     </View>
