@@ -48,10 +48,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const nextStep = useCallback(async () => {
+    console.log('[Onboarding] nextStep called, currentStep:', currentStep);
     if (currentStep < TOTAL_STEPS) {
       const next = currentStep + 1;
+      console.log('[Onboarding] advancing to step:', next);
       setCurrentStep(next);
       await onboardingStorage.setStep(next);
+    } else {
+      console.log('[Onboarding] already at final step');
     }
   }, [currentStep]);
 

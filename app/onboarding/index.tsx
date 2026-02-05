@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useOnboarding } from './context';
 import WelcomeStep from './steps/WelcomeStep';
@@ -10,27 +10,33 @@ import PersonalizeStep from './steps/PersonalizeStep';
 import CompleteStep from './steps/CompleteStep';
 import Colors from '@/constants/colors';
 
-const steps = [
-  WelcomeStep,
-  ProfileStep,
-  TutorialStep,
-  AchievementStep,
-  StreakStep,
-  PersonalizeStep,
-  CompleteStep,
-];
+function StepRenderer({ step }: { step: number }) {
+  switch (step) {
+    case 1:
+      return <WelcomeStep />;
+    case 2:
+      return <ProfileStep />;
+    case 3:
+      return <TutorialStep />;
+    case 4:
+      return <AchievementStep />;
+    case 5:
+      return <StreakStep />;
+    case 6:
+      return <PersonalizeStep />;
+    case 7:
+      return <CompleteStep />;
+    default:
+      return <WelcomeStep />;
+  }
+}
 
 export default function OnboardingIndex() {
   const { currentStep, isLoading } = useOnboarding();
-  const [StepComponent, setStepComponent] = useState<React.ComponentType | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && currentStep >= 1 && currentStep <= steps.length) {
-      setStepComponent(() => steps[currentStep - 1]);
-    }
-  }, [currentStep, isLoading]);
+  console.log('[Onboarding] currentStep:', currentStep, 'isLoading:', isLoading);
 
-  if (isLoading || !StepComponent) {
+  if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.accent} />
@@ -38,7 +44,7 @@ export default function OnboardingIndex() {
     );
   }
 
-  return <StepComponent />;
+  return <StepRenderer step={currentStep} />;
 }
 
 const styles = StyleSheet.create({
