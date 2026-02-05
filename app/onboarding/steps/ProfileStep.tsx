@@ -22,6 +22,7 @@ export default function ProfileStep() {
   const [name, setName] = useState('');
   const [selectedGoal, setSelectedGoal] = useState<GoalId | null>(null);
   const [hasTriggeredNameConfetti, setHasTriggeredNameConfetti] = useState(false);
+  const [hasTriggeredGoalConfetti, setHasTriggeredGoalConfetti] = useState(false);
   const [showNameCheck, setShowNameCheck] = useState(false);
   const [showGoalCheck, setShowGoalCheck] = useState(false);
 
@@ -63,7 +64,10 @@ export default function ProfileStep() {
   const handleGoalSelect = (goalId: GoalId) => {
     setSelectedGoal(goalId);
     setShowGoalCheck(true);
-    triggerConfetti('small');
+    if (!hasTriggeredGoalConfetti) {
+      setHasTriggeredGoalConfetti(true);
+      triggerConfetti('small');
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateData({ goal: goalId });
 
