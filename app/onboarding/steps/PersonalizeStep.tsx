@@ -4,14 +4,13 @@ import { Sparkles, MessageSquare, Trophy, Target } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
+
 import SparkleEffect from '@/components/onboarding/SparkleEffect';
 import Colors from '@/constants/colors';
 
 export default function PersonalizeStep() {
-  const { nextStep, currentStep, totalSteps, data, addXp } = useOnboarding();
+  const { nextStep, currentStep, totalSteps, data, addXp, triggerConfetti } = useOnboarding();
   
-  const [showConfetti, setShowConfetti] = React.useState(false);
   const [showSparkles, setShowSparkles] = React.useState(false);
   
   const fadeAnims = useRef(
@@ -43,7 +42,7 @@ export default function PersonalizeStep() {
     // Trigger XP and sparkles after animations
     setTimeout(() => {
       setShowSparkles(true);
-      setShowConfetti(true);
+      triggerConfetti('medium');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }, 500);
 
@@ -54,7 +53,7 @@ export default function PersonalizeStep() {
       setShowSparkles(false);
       nextStep();
     }, 3500);
-  }, [fadeAnims, slideAnims, addXp, nextStep]);
+  }, [fadeAnims, slideAnims, addXp, nextStep, triggerConfetti]);
 
   const features = [
     { icon: MessageSquare, label: 'AI Coaches', color: Colors.accent },
@@ -149,11 +148,6 @@ export default function PersonalizeStep() {
             <Text style={styles.pathText}>Your learning path awaits!</Text>
           </Animated.View>
         </View>
-
-        <ConfettiEffect 
-          trigger={showConfetti} 
-          intensity="medium"
-        />
       </View>
     </View>
   );

@@ -4,7 +4,7 @@ import { User } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
+
 import CheckmarkAnimation from '@/components/onboarding/CheckmarkAnimation';
 import Colors from '@/constants/colors';
 
@@ -17,12 +17,11 @@ const GOALS = [
 type GoalId = typeof GOALS[number]['id'];
 
 export default function ProfileStep() {
-  const { nextStep, currentStep, totalSteps, updateData } = useOnboarding();
+  const { nextStep, currentStep, totalSteps, updateData, triggerConfetti } = useOnboarding();
   
   const [name, setName] = useState('');
   const [selectedGoal, setSelectedGoal] = useState<GoalId | null>(null);
-  const [showNameConfetti, setShowNameConfetti] = useState(false);
-  const [showGoalConfetti, setShowGoalConfetti] = useState(false);
+  const [hasTriggeredNameConfetti, setHasTriggeredNameConfetti] = useState(false);
   const [showNameCheck, setShowNameCheck] = useState(false);
   const [showGoalCheck, setShowGoalCheck] = useState(false);
 
@@ -46,15 +45,13 @@ export default function ProfileStep() {
 
   const handleNameChange = (text: string) => {
     setName(text);
-    if (text.length === 1 && !showNameConfetti) {
-      // First character typed
-      setShowNameConfetti(true);
+    if (text.length === 1 && !hasTriggeredNameConfetti) {
+      setHasTriggeredNameConfetti(true);
       setShowNameCheck(true);
+      triggerConfetti('small');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      // Reset animations
       setTimeout(() => {
-        setShowNameConfetti(false);
         setShowNameCheck(false);
       }, 2500);
     }
@@ -62,13 +59,12 @@ export default function ProfileStep() {
 
   const handleGoalSelect = (goalId: GoalId) => {
     setSelectedGoal(goalId);
-    setShowGoalConfetti(true);
     setShowGoalCheck(true);
+    triggerConfetti('small');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     updateData({ goal: goalId });
 
     setTimeout(() => {
-      setShowGoalConfetti(false);
       setShowGoalCheck(false);
     }, 2500);
   };
@@ -119,10 +115,6 @@ export default function ProfileStep() {
               />
             </View>
           </View>
-          <ConfettiEffect 
-            trigger={showNameConfetti} 
-            intensity="small"
-          />
         </View>
 
         {/* Goal Selection */}
@@ -158,10 +150,6 @@ export default function ProfileStep() {
               </TouchableOpacity>
             ))}
           </View>
-          <ConfettiEffect 
-            trigger={showGoalConfetti} 
-            intensity="small"
-          />
         </View>
       </Animated.View>
 

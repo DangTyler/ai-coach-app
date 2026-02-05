@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
 import { useOnboarding } from './context';
 import WelcomeStep from './steps/WelcomeStep';
 import ProfileStep from './steps/ProfileStep';
@@ -9,6 +9,9 @@ import StreakStep from './steps/StreakStep';
 import PersonalizeStep from './steps/PersonalizeStep';
 import CompleteStep from './steps/CompleteStep';
 import Colors from '@/constants/colors';
+import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
+
+const { width, height } = Dimensions.get('window');
 
 function StepRenderer({ step }: { step: number }) {
   switch (step) {
@@ -32,7 +35,7 @@ function StepRenderer({ step }: { step: number }) {
 }
 
 export default function OnboardingIndex() {
-  const { currentStep, isLoading } = useOnboarding();
+  const { currentStep, isLoading, confettiTrigger, confettiIntensity } = useOnboarding();
 
   console.log('[Onboarding] currentStep:', currentStep, 'isLoading:', isLoading);
 
@@ -44,14 +47,35 @@ export default function OnboardingIndex() {
     );
   }
 
-  return <StepRenderer step={currentStep} />;
+  return (
+    <View style={styles.container}>
+      <StepRenderer step={currentStep} />
+      <View style={styles.confettiContainer} pointerEvents="none">
+        <ConfettiEffect 
+          trigger={confettiTrigger} 
+          intensity={confettiIntensity}
+        />
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.background,
+  },
+  confettiContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: width,
+    height: height,
+    zIndex: 9999,
   },
 });

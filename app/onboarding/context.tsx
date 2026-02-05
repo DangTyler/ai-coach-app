@@ -1,18 +1,23 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { onboardingStorage, OnboardingData } from './storage';
 
+type ConfettiIntensity = 'small' | 'medium' | 'large';
+
 interface OnboardingContextType {
   currentStep: number;
   totalSteps: number;
   xp: number;
   data: OnboardingData;
   isLoading: boolean;
+  confettiTrigger: boolean;
+  confettiIntensity: ConfettiIntensity;
   goToStep: (step: number) => void;
   nextStep: () => void;
   prevStep: () => void;
   addXp: (amount: number) => void;
   updateData: (data: Partial<OnboardingData>) => void;
   completeOnboarding: () => Promise<void>;
+  triggerConfetti: (intensity?: ConfettiIntensity) => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
@@ -22,6 +27,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [xp, setXp] = useState(0);
   const [data, setData] = useState<OnboardingData>({});
   const [isLoading, setIsLoading] = useState(true);
+  const [confettiTrigger, setConfettiTrigger] = useState(false);
+  const [confettiIntensity, setConfettiIntensity] = useState<ConfettiIntensity>('medium');
 
   const TOTAL_STEPS = 7;
 
@@ -87,6 +94,19 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     await onboardingStorage.markComplete();
   }, []);
 
+  const triggerConfetti = useCallback((intensity: ConfettiIntensity = 'medium') => {
+    setConfettiTrigger(false);
+    setConfettiIntensity(intensity);
+    // Small delay to ensure state reset is processed
+    setTimeout(() => {
+      setConfettiTrigger(true);
+    }, 10);
+    // Auto-reset after animation
+    setTimeout(() => {
+      setConfettiTrigger(false);
+    }, 3500);
+  }, []);
+
   return (
     <OnboardingContext.Provider
       value={{
@@ -95,12 +115,15 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         xp,
         data,
         isLoading,
+        confettiTrigger,
+        confettiIntensity,
         goToStep,
         nextStep,
         prevStep,
         addXp,
         updateData,
         completeOnboarding,
+        triggerConfetti,
       }}
     >
       {children}
