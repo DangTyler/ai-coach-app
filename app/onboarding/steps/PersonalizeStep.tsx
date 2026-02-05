@@ -15,10 +15,10 @@ export default function PersonalizeStep() {
   const [showSparkles, setShowSparkles] = React.useState(false);
   
   const fadeAnims = useRef(
-    Array.from({ length: 4 }, () => new Animated.Value(0))
+    Array.from({ length: 7 }, () => new Animated.Value(0))
   ).current;
   const slideAnims = useRef(
-    Array.from({ length: 4 }, () => new Animated.Value(30))
+    Array.from({ length: 7 }, () => new Animated.Value(30))
   ).current;
 
   useEffect(() => {
@@ -117,8 +117,8 @@ export default function PersonalizeStep() {
                   style={[
                     styles.featureCard,
                     {
-                      opacity: fadeAnims[index + 1],
-                      transform: [{ translateY: slideAnims[index + 1] }],
+                      opacity: fadeAnims[index + 2],
+                      transform: [{ translateY: slideAnims[index + 2] }],
                     },
                   ]}
                 >
@@ -136,8 +136,8 @@ export default function PersonalizeStep() {
             style={[
               styles.pathContainer,
               {
-                opacity: fadeAnims[3],
-                transform: [{ translateY: slideAnims[3] }],
+                opacity: fadeAnims[6],
+                transform: [{ translateY: slideAnims[6] }],
               },
             ]}
           >
