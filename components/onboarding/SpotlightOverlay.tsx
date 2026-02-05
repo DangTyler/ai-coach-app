@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Text, TouchableWithoutFeedback, Dimensions } from 'react-native';
-import { useTutorial } from '@/app/onboarding/tutorial-context';
 import Colors from '@/constants/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -13,18 +12,15 @@ interface SpotlightOverlayProps {
 }
 
 export default function SpotlightOverlay({ 
-  isVisible,
+  isVisible = false,
   target,
-  tooltip,
-  onComplete 
+  tooltip = '',
+  onComplete = () => {} 
 }: SpotlightOverlayProps = {}) {
-  const context = useTutorial();
-  
-  // Use props if provided, otherwise use context
-  const isActive = isVisible !== undefined ? isVisible : context.isActive;
-  const spotlightTarget = target !== undefined ? target : context.spotlightTarget;
-  const tooltipText = tooltip !== undefined ? tooltip : context.tooltipText;
-  const handleComplete = onComplete || context.endTutorial;
+  const isActive = isVisible;
+  const spotlightTarget = target;
+  const tooltipText = tooltip;
+  const handleComplete = onComplete;
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
