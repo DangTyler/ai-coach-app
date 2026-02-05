@@ -1,22 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { Rocket, Award, Flame } from 'lucide-react-native';
+import { Rocket, Award, Flame, Sparkles } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useOnboarding } from '../context';
-import { onboardingStorage } from '../storage';
 import ProgressBar from '@/components/onboarding/ProgressBar';
-import XPAnimation from '@/components/onboarding/XPAnimation';
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import Colors from '@/constants/colors';
 
 export default function CompleteStep() {
-  const { currentStep, totalSteps, xp, data, completeOnboarding } = useOnboarding();
+  const { currentStep, totalSteps, data, completeOnboarding } = useOnboarding();
   const router = useRouter();
   
   const [showConfetti, setShowConfetti] = useState(true);
-  const [displayXp, setDisplayXp] = useState(0);
-  const [showXp, setShowXp] = useState(false);
+  const [showSecondBurst, setShowSecondBurst] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -47,24 +44,11 @@ export default function CompleteStep() {
       }),
     ]).start();
 
-    // XP counter roll up
-    const totalXp = xp || 130; // Default to 130 if not tracked
-    const duration = 2000;
-    const steps = 60;
-    const increment = totalXp / steps;
-    let current = 0;
-
-    const interval = setInterval(() => {
-      current += increment;
-      if (current >= totalXp) {
-        setDisplayXp(totalXp);
-        clearInterval(interval);
-        setShowXp(true);
-        setTimeout(() => setShowXp(false), 1500);
-      } else {
-        setDisplayXp(Math.floor(current));
-      }
-    }, duration / steps);
+    // Second confetti burst after initial one settles
+    setTimeout(() => {
+      setShowSecondBurst(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }, 1500);
 
     // Flame pulse animation
     Animated.loop(
@@ -81,9 +65,7 @@ export default function CompleteStep() {
         }),
       ])
     ).start();
-
-    return () => clearInterval(interval);
-  }, [xp, fadeAnim, slideAnim, flamePulse]);
+  }, [fadeAnim, slideAnim, flamePulse]);
 
   const handleStart = async () => {
     // Button bounce
@@ -118,6 +100,10 @@ export default function CompleteStep() {
         trigger={showConfetti} 
         intensity="large"
       />
+      <ConfettiEffect 
+        trigger={showSecondBurst} 
+        intensity="medium"
+      />
       
       <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
@@ -142,9 +128,9 @@ export default function CompleteStep() {
         {/* Summary Cards */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryCard}>
-            <View style={styles.xpBadge}>
-              <Text style={styles.xpValue}>{displayXp}</Text>
-              <Text style={styles.xpLabel}>XP Earned</Text>
+            <View style={styles.celebrationBadge}>
+              <Sparkles color={Colors.accent} size={32} />
+              <Text style={styles.celebrationText}>Ready to Learn!</Text>
             </View>
           </View>
 
@@ -153,7 +139,7 @@ export default function CompleteStep() {
               <View style={styles.badgeIcon}>
                 <Award color={Colors.accent} size={24} />
               </View>
-              <Text style={styles.badgeText}>1 Badge</Text>
+              <Text style={styles.badgeText}>Profile Set</Text>
             </View>
 
             <View style={styles.badgeItem}>
@@ -165,16 +151,10 @@ export default function CompleteStep() {
               >
                 <Flame color={Colors.accent} size={24} />
               </Animated.View>
-              <Text style={styles.badgeText}>3 Day Streak</Text>
+              <Text style={styles.badgeText}>Day 1 Streak</Text>
             </View>
           </View>
         </View>
-
-        <XPAnimation 
-          amount={displayXp} 
-          trigger={showXp} 
-          y={-20}
-        />
       </Animated.View>
 
       <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
@@ -243,18 +223,15 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 4,
   },
-  xpBadge: {
+  celebrationBadge: {
     alignItems: 'center',
+    paddingVertical: 8,
   },
-  xpValue: {
-    fontSize: 56,
+  celebrationText: {
+    fontSize: 24,
     fontWeight: '700',
     color: Colors.accent,
-  },
-  xpLabel: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    fontWeight: '600',
+    marginTop: 12,
   },
   badgesRow: {
     flexDirection: 'row',
