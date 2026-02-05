@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { Animated, StyleSheet, View, Dimensions } from 'react-native';
 
 interface ConfettiEffectProps {
@@ -74,31 +74,14 @@ function createParticles(count: number, wave: number = 0): Particle[] {
 interface ConfettiParticleProps {
   particle: Particle;
   progress: Animated.Value;
+  globalWobble: Animated.Value;
 }
 
-function ConfettiParticle({ particle, progress }: ConfettiParticleProps) {
+const ConfettiParticle = React.memo(function ConfettiParticle({ particle, progress, globalWobble }: ConfettiParticleProps) {
   const gravity = 900;
   const duration = 3000;
-  const wobbleRef = useRef(new Animated.Value(0)).current;
   
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(wobbleRef, {
-          toValue: 1,
-          duration: 1000 / particle.wobbleSpeed,
-          useNativeDriver: true,
-        }),
-        Animated.timing(wobbleRef, {
-          toValue: -1,
-          duration: 1000 / particle.wobbleSpeed,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [wobbleRef, particle.wobbleSpeed]);
-  
-  const wobbleX = wobbleRef.interpolate({
+  const wobbleX = globalWobble.interpolate({
     inputRange: [-1, 1],
     outputRange: [-particle.wobbleAmplitude, particle.wobbleAmplitude],
   });
@@ -176,23 +159,27 @@ function ConfettiParticle({ particle, progress }: ConfettiParticleProps) {
       ]}
     />
   );
-}
+});
 
 export default function ConfettiEffect({ trigger, intensity = 'medium', onComplete }: ConfettiEffectProps) {
   const progress1 = useRef(new Animated.Value(0)).current;
   const progress2 = useRef(new Animated.Value(0)).current;
+  const globalWobble = useRef(new Animated.Value(0)).current;
   const [showWave2, setShowWave2] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const animationsRef = useRef<Animated.CompositeAnimation[]>([]);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
-  const particleCount = intensity === 'small' ? 60 : intensity === 'large' ? 200 : 120;
-  const wave2Count = intensity === 'small' ? 40 : intensity === 'large' ? 120 : 80;
+  const particleCount = intensity === 'small' ? 50 : intensity === 'large' ? 150 : 100;
+  const wave2Count = intensity === 'small' ? 30 : intensity === 'large' ? 100 : 60;
   const duration = 3000;
   
   const particles1 = useMemo(() => {
-    if (trigger) {
+    if (isVisible) {
       return createParticles(particleCount, 0);
     }
     return [];
-  }, [trigger, particleCount]);
+  }, [isVisible, particleCount]);
   
   const particles2 = useMemo(() => {
     if (showWave2) {
@@ -201,34 +188,82 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
     return [];
   }, [showWave2, wave2Count]);
 
+  const stopAllAnimations = useCallback(() => {
+    animationsRef.current.forEach(anim => anim.stop());
+    animationsRef.current = [];
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (trigger) {
+      stopAllAnimations();
+      
       progress1.setValue(0);
       progress2.setValue(0);
+      globalWobble.setValue(0);
       setShowWave2(false);
+      setIsVisible(true);
       
-      Animated.timing(progress1, {
+      const wobbleAnim = Animated.loop(
+        Animated.sequence([
+          Animated.timing(globalWobble, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(globalWobble, {
+            toValue: -1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      animationsRef.current.push(wobbleAnim);
+      wobbleAnim.start();
+      
+      const wave1Anim = Animated.timing(progress1, {
         toValue: 1,
         duration,
         useNativeDriver: true,
-      }).start();
+      });
+      animationsRef.current.push(wave1Anim);
+      wave1Anim.start();
       
-      const wave2Timer = setTimeout(() => {
+      timerRef.current = setTimeout(() => {
         setShowWave2(true);
-        Animated.timing(progress2, {
+        const wave2Anim = Animated.timing(progress2, {
           toValue: 1,
           duration: duration - 300,
           useNativeDriver: true,
-        }).start(() => {
+        });
+        animationsRef.current.push(wave2Anim);
+        wave2Anim.start(() => {
           onComplete?.();
         });
       }, 300);
       
-      return () => clearTimeout(wave2Timer);
+      const cleanupTimer = setTimeout(() => {
+        setIsVisible(false);
+        setShowWave2(false);
+        stopAllAnimations();
+      }, duration + 100);
+      
+      return () => {
+        clearTimeout(cleanupTimer);
+        stopAllAnimations();
+      };
+    } else {
+      stopAllAnimations();
+      setIsVisible(false);
+      setShowWave2(false);
     }
-  }, [trigger, duration, onComplete, progress1, progress2]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger]);
 
-  if (!trigger) return null;
+  if (!isVisible) return null;
 
   return (
     <View style={styles.container} pointerEvents="none">
@@ -237,6 +272,7 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
           key={`w1-${particle.id}`}
           particle={particle}
           progress={progress1}
+          globalWobble={globalWobble}
         />
       ))}
       {showWave2 && particles2.map((particle) => (
@@ -244,6 +280,7 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
           key={`w2-${particle.id}`}
           particle={particle}
           progress={progress2}
+          globalWobble={globalWobble}
         />
       ))}
     </View>

@@ -51,11 +51,6 @@ export default function TutorialStep() {
 
   return (
     <View style={styles.container}>
-      <ConfettiEffect 
-        trigger={showConfetti} 
-        intensity="medium"
-      />
-      
       <ProgressBar currentStep={currentStep} totalSteps={totalSteps} />
 
       <Animated.View
@@ -119,6 +114,11 @@ export default function TutorialStep() {
           </View>
         )}
       </Animated.View>
+      
+      <ConfettiEffect 
+        trigger={showConfetti} 
+        intensity="large"
+      />
     </View>
   );
 }
