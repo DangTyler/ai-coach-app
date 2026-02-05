@@ -1,11 +1,13 @@
-import { Tabs } from "expo-router";
-import { BookOpen, MessageSquare } from "lucide-react-native";
+import { Tabs, useRouter } from "expo-router";
+import { BookOpen, MessageSquare, Settings } from "lucide-react-native";
 import React from "react";
-import { Platform } from "react-native";
+import { Platform, TouchableOpacity } from "react-native";
 
 import Colors from "@/constants/colors";
 
 export default function TabLayout() {
+  const router = useRouter();
+
   return (
     <Tabs
       backBehavior="none"
@@ -36,6 +38,23 @@ export default function TabLayout() {
         name="saved"
         options={{
           title: "Saved",
+          headerShown: true,
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => router.push('/settings' as any)}
+              style={{ marginRight: 16, padding: 8 }}
+            >
+              <Settings color={Colors.navy} size={24} />
+            </TouchableOpacity>
+          ),
+          headerStyle: {
+            backgroundColor: Colors.background,
+          },
+          headerTitleStyle: {
+            color: Colors.navy,
+            fontWeight: '700',
+            fontSize: 18,
+          },
           tabBarIcon: ({ color, size }) => <MessageSquare color={color} size={size} />,
         }}
       />

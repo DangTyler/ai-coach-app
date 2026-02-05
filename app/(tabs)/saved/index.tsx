@@ -141,7 +141,7 @@ export default function SavedScreen() {
   const chatsWithMessages = savedChats.filter(c => c.messages.length > 0);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Saved Chats</Text>
         <Text style={styles.subtitle}>
