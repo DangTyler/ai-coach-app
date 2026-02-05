@@ -86,7 +86,7 @@ Personality & Approach:
   }, [coach, contextCards]);
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status, setMessages } = useRorkAgent({
-    tools: {},
+    tools: {} as Record<string, never>,
   });
 
   const [isSystemInitialized, setIsSystemInitialized] = useState(false);
