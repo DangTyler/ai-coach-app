@@ -22,33 +22,6 @@ export default function TutorialStep() {
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    // Check if we're returning from completed tutorial
-    const checkTutorialCompletion = async () => {
-      const isComplete = await onboardingStorage.isTutorialComplete();
-      if (isComplete) {
-        // Tutorial was completed in TabLayout
-        await onboardingStorage.clearTutorialFlags();
-        
-        // Show celebration
-        setShowConfetti(true);
-        setShowXp(true);
-        addXp(15);
-        
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        
-        setTimeout(() => {
-          setShowXp(false);
-        }, 1500);
-        
-        setTimeout(() => {
-          setShowConfetti(false);
-          nextStep();
-        }, 2000);
-      }
-    };
-    
-    checkTutorialCompletion();
-    
     // Entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -62,7 +35,7 @@ export default function TutorialStep() {
         friction: 8,
       }),
     ]).start();
-  }, [fadeAnim, slideAnim, addXp, nextStep]);
+  }, [fadeAnim, slideAnim]);
 
   const handleStartTutorial = async () => {
     setTutorialStarted(true);
@@ -73,7 +46,7 @@ export default function TutorialStep() {
     
     // Navigate to main app with Library tab
     // The Library tab layout will detect tutorial mode from AsyncStorage
-    router.push('/(tabs)/(library)' as any);
+    router.replace('/(tabs)/(library)' as any);
   };
 
   const handleSimulateTap = () => {

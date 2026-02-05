@@ -54,11 +54,14 @@ export default function TabLayout() {
       // Complete tutorial step
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      // Mark tutorial as complete in storage
+      // Mark tutorial as complete and advance step in storage
       await onboardingStorage.setTutorialComplete(true);
+      await onboardingStorage.setStep(4); // Advance to next step (AchievementStep)
       
-      // Navigate back to onboarding
-      router.push('/onboarding' as any);
+      setTutorialActive(false);
+      
+      // Navigate back to onboarding, replacing current screen
+      router.replace('/onboarding' as any);
     }
   };
 
