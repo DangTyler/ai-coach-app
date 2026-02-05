@@ -37,7 +37,8 @@ interface Particle {
   velocityY: number;
   rotation: number;
   rotationSpeed: number;
-  wobbleSpeed: number;
+  wobblePhase: number;
+  wobbleCycles: number;
   wobbleAmplitude: number;
   wave: number;
 }
@@ -63,8 +64,9 @@ function createParticles(count: number, wave: number = 0): Particle[] {
       velocityY: Math.sin(angle) * speed - 350,
       rotation: Math.random() * 360,
       rotationSpeed: (Math.random() - 0.5) * 1080,
-      wobbleSpeed: 3 + Math.random() * 4,
-      wobbleAmplitude: 20 + Math.random() * 40,
+      wobblePhase: Math.random() * Math.PI * 2,
+      wobbleCycles: 1 + Math.random() * 1.5,
+      wobbleAmplitude: 15 + Math.random() * 25,
       wave,
     });
   }
@@ -74,21 +76,28 @@ function createParticles(count: number, wave: number = 0): Particle[] {
 interface ConfettiParticleProps {
   particle: Particle;
   progress: Animated.Value;
-  globalWobble: Animated.Value;
 }
 
-const ConfettiParticle = React.memo(function ConfettiParticle({ particle, progress, globalWobble }: ConfettiParticleProps) {
+const ConfettiParticle = React.memo(function ConfettiParticle({ particle, progress }: ConfettiParticleProps) {
   const gravity = 900;
   const duration = 3000;
   
-  const wobbleX = globalWobble.interpolate({
-    inputRange: [-1, 1],
-    outputRange: [-particle.wobbleAmplitude, particle.wobbleAmplitude],
-  });
+  const baseXDisplacement = particle.velocityX * (duration / 1000);
+  
+  const driftValues = useMemo(() => {
+    const steps = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+    return steps.map(t => {
+      const baseX = baseXDisplacement * t;
+      const sineWave = Math.sin(t * particle.wobbleCycles * Math.PI * 2 + particle.wobblePhase);
+      const amplitudeGrowth = 0.3 + t * 0.7;
+      const drift = sineWave * particle.wobbleAmplitude * amplitudeGrowth;
+      return baseX + drift;
+    });
+  }, [baseXDisplacement, particle.wobbleCycles, particle.wobblePhase, particle.wobbleAmplitude]);
   
   const translateX = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, particle.velocityX * (duration / 1000)],
+    inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+    outputRange: driftValues,
   });
   
   const translateY = progress.interpolate({
@@ -148,7 +157,7 @@ const ConfettiParticle = React.memo(function ConfettiParticle({ particle, progre
           backgroundColor: particle.color,
           opacity,
           transform: [
-            { translateX: Animated.add(translateX, wobbleX) },
+            { translateX },
             { translateY },
             { rotate },
             { rotateY },
@@ -164,7 +173,6 @@ const ConfettiParticle = React.memo(function ConfettiParticle({ particle, progre
 export default function ConfettiEffect({ trigger, intensity = 'medium', onComplete }: ConfettiEffectProps) {
   const progress1 = useRef(new Animated.Value(0)).current;
   const progress2 = useRef(new Animated.Value(0)).current;
-  const globalWobble = useRef(new Animated.Value(0)).current;
   const [showWave2, setShowWave2] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const animationsRef = useRef<Animated.CompositeAnimation[]>([]);
@@ -203,26 +211,8 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
       
       progress1.setValue(0);
       progress2.setValue(0);
-      globalWobble.setValue(0);
       setShowWave2(false);
       setIsVisible(true);
-      
-      const wobbleAnim = Animated.loop(
-        Animated.sequence([
-          Animated.timing(globalWobble, {
-            toValue: 1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-          Animated.timing(globalWobble, {
-            toValue: -1,
-            duration: 200,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      animationsRef.current.push(wobbleAnim);
-      wobbleAnim.start();
       
       const wave1Anim = Animated.timing(progress1, {
         toValue: 1,
@@ -272,7 +262,6 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
           key={`w1-${particle.id}`}
           particle={particle}
           progress={progress1}
-          globalWobble={globalWobble}
         />
       ))}
       {showWave2 && particles2.map((particle) => (
@@ -280,7 +269,6 @@ export default function ConfettiEffect({ trigger, intensity = 'medium', onComple
           key={`w2-${particle.id}`}
           particle={particle}
           progress={progress2}
-          globalWobble={globalWobble}
         />
       ))}
     </View>
