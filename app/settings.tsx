@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Moon, Sun } from "lucide-react-native";
+import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   View,
@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { onboardingStorage } from "@/app/onboarding/storage";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -22,6 +23,11 @@ export default function SettingsScreen() {
     setIsDarkMode(value);
     // TODO: Implement actual theme switching logic
     // This would typically update a global theme context
+  };
+
+  const handleReplayOnboarding = async () => {
+    await onboardingStorage.reset();
+    router.replace('/onboarding' as any);
   };
 
   return (
@@ -79,6 +85,35 @@ export default function SettingsScreen() {
                 ios_backgroundColor={Colors.border}
               />
             </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Onboarding</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.settingRow}
+              onPress={handleReplayOnboarding}
+              activeOpacity={0.7}
+            >
+              <View style={styles.settingLeft}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: Colors.accentLight },
+                  ]}
+                >
+                  <RotateCcw color={Colors.accent} size={20} />
+                </View>
+                <View style={styles.settingTextContainer}>
+                  <Text style={styles.settingLabel}>Replay Onboarding</Text>
+                  <Text style={styles.settingDescription}>
+                    Walk through the tutorial again
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight color={Colors.textMuted} size={20} />
+            </TouchableOpacity>
           </View>
         </View>
 
