@@ -1,7 +1,7 @@
 import { Tabs, useRouter } from "expo-router";
 import { BookOpen, MessageSquare, Settings } from "lucide-react-native";
 import React, { useRef, useEffect, useState } from "react";
-import { Platform, TouchableOpacity, View, findNodeHandle, UIManager, Dimensions, StyleSheet } from "react-native";
+import { Platform, TouchableOpacity, View, Dimensions, StyleSheet } from "react-native";
 
 import Colors from "@/constants/colors";
 import SpotlightOverlay from "@/components/onboarding/SpotlightOverlay";
@@ -35,17 +35,11 @@ export default function TabLayout() {
 
   const measureLibraryTab = () => {
     if (libraryTabRef.current) {
-      const handle = findNodeHandle(libraryTabRef.current);
-      if (handle) {
-        UIManager.measure(handle, (x, y, width, height, pageX, pageY) => {
-          setSpotlightPosition({
-            x: pageX,
-            y: pageY,
-            width,
-            height,
-          });
-        });
-      }
+      (libraryTabRef.current as any).measureInWindow?.((x: number, y: number, width: number, height: number) => {
+        if (width > 0 && height > 0) {
+          setSpotlightPosition({ x, y, width, height });
+        }
+      });
     }
   };
 
