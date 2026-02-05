@@ -45,7 +45,10 @@ export default function ProfileStep() {
 
   const handleNameChange = (text: string) => {
     setName(text);
-    if (text.length === 1 && !hasTriggeredNameConfetti) {
+  };
+
+  const handleNameBlur = () => {
+    if (name.trim().length > 0 && !hasTriggeredNameConfetti) {
       setHasTriggeredNameConfetti(true);
       setShowNameCheck(true);
       triggerConfetti('small');
@@ -106,6 +109,7 @@ export default function ProfileStep() {
               placeholderTextColor={Colors.textMuted}
               value={name}
               onChangeText={handleNameChange}
+              onBlur={handleNameBlur}
               autoCapitalize="words"
             />
             <View style={styles.checkContainer}>
