@@ -5,7 +5,6 @@ import WelcomeStep from './steps/WelcomeStep';
 import ProfileStep from './steps/ProfileStep';
 import TutorialStep from './steps/TutorialStep';
 import AchievementStep from './steps/AchievementStep';
-import StreakStep from './steps/StreakStep';
 import PersonalizeStep from './steps/PersonalizeStep';
 import CompleteStep from './steps/CompleteStep';
 import Colors from '@/constants/colors';
@@ -24,10 +23,8 @@ function StepRenderer({ step }: { step: number }) {
     case 4:
       return <AchievementStep />;
     case 5:
-      return <StreakStep />;
-    case 6:
       return <PersonalizeStep />;
-    case 7:
+    case 6:
       return <CompleteStep />;
     default:
       return <WelcomeStep />;

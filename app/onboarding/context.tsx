@@ -30,7 +30,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [confettiTrigger, setConfettiTrigger] = useState(false);
   const [confettiIntensity, setConfettiIntensity] = useState<ConfettiIntensity>('medium');
 
-  const TOTAL_STEPS = 7;
+  const TOTAL_STEPS = 6;
 
   useEffect(() => {
     loadState();
