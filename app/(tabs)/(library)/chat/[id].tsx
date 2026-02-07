@@ -1,7 +1,7 @@
 import { useRorkAgent } from "@rork-ai/toolkit-sdk";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
-import * as Speech from "expo-speech";
+import { speakWithElevenLabs, stopElevenLabsSpeech } from "@/store/elevenlabs";
 import { useLocalSearchParams, Stack } from "expo-router";
 import { Send, SlidersHorizontal, X, Mic, Volume2, Square, AudioLines, Zap } from "lucide-react-native";
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
@@ -546,7 +546,7 @@ Personality & Approach:
         stopRecording();
       }
       if (isSpeaking) {
-        Speech.stop();
+        stopElevenLabsSpeech();
         setIsSpeaking(false);
         setSpeakingMessageId(null);
       }
@@ -560,21 +560,23 @@ Personality & Approach:
 
   const speakMessage = useCallback(async (messageId: string, text: string, isVoiceConvo?: boolean) => {
     if (isSpeaking && speakingMessageId === messageId) {
-      Speech.stop();
+      await stopElevenLabsSpeech();
       setIsSpeaking(false);
       setSpeakingMessageId(null);
       return;
     }
     
     if (isSpeaking) {
-      Speech.stop();
+      await stopElevenLabsSpeech();
     }
     
     setIsSpeaking(true);
     setSpeakingMessageId(messageId);
     
-    Speech.speak(text, {
-      onDone: () => {
+    await speakWithElevenLabs(
+      text,
+      id || '',
+      () => {
         setIsSpeaking(false);
         setSpeakingMessageId(null);
         if (isVoiceConvo) {
@@ -583,16 +585,12 @@ Personality & Approach:
           }, 400);
         }
       },
-      onStopped: () => {
+      () => {
         setIsSpeaking(false);
         setSpeakingMessageId(null);
       },
-      onError: () => {
-        setIsSpeaking(false);
-        setSpeakingMessageId(null);
-      },
-    });
-  }, [isSpeaking, speakingMessageId, startRecording]);
+    );
+  }, [isSpeaking, speakingMessageId, startRecording, id]);
 
   useEffect(() => {
     if (!isVoiceConvoActive) return;
@@ -607,7 +605,7 @@ Personality & Approach:
   useEffect(() => {
     return () => {
       if (isSpeaking) {
-        Speech.stop();
+        stopElevenLabsSpeech();
       }
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
