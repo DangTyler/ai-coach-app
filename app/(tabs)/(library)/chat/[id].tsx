@@ -512,7 +512,7 @@ Personality & Approach:
       {!item.isUser && (
         <Image source={{ uri: coach.avatar }} style={styles.messageAvatar} />
       )}
-      <View style={styles.messageBubbleRow}>
+      <View style={[styles.messageBubbleRow, item.isUser && styles.userBubbleRow]}>
         <View
           style={[
             styles.messageBubble,
@@ -803,14 +803,17 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   messageBubble: {
-    maxWidth: "75%",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
+    flexShrink: 1,
   },
   userBubble: {
     backgroundColor: Colors.navy,
     borderBottomRightRadius: 6,
+  },
+  userBubbleRow: {
+    maxWidth: "85%",
   },
   aiBubble: {
     backgroundColor: Colors.white,
@@ -976,6 +979,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     maxWidth: "80%",
+    flexShrink: 1,
   },
   speakButton: {
     width: 28,
