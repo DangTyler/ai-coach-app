@@ -79,13 +79,19 @@ export default function ChatScreen() {
     let userContextSection = "";
     
     // Add stored user context from onboarding
-    if (userContext?.name || userContext?.helpTopics) {
+    if (userContext?.name || userContext?.background || userContext?.goals) {
       userContextSection += "\n\nAbout the user:";
       if (userContext.name) {
         userContextSection += `\n- Name: ${userContext.name}`;
       }
-      if (userContext.helpTopics) {
-        userContextSection += `\n- Interested in help with: ${userContext.helpTopics}`;
+      if (userContext.background) {
+        userContextSection += `\n- Background: ${userContext.background}`;
+      }
+      if (userContext.goals) {
+        userContextSection += `\n- Goals: ${userContext.goals}`;
+      }
+      if (userContext.experienceLevel) {
+        userContextSection += `\n- Experience Level: ${userContext.experienceLevel}`;
       }
     }
     

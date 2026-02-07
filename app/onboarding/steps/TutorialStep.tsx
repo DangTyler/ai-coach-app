@@ -8,29 +8,46 @@ import { onboardingStorage } from '../storage';
 import ProgressBar from '@/components/onboarding/ProgressBar';
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
 import Colors from '@/constants/colors';
-import { coaches } from '@/mocks/coaches';
 
-const RECOMMENDED_COACH = coaches[0];
+const CONTEXT_QUESTIONS = [
+  { key: 'background', question: "What's your current situation or background in this area?" },
+  { key: 'goals', question: "What are you hoping to achieve?" },
+  { key: 'experienceLevel', question: "How would you describe your experience level?" },
+];
 
 export default function TutorialStep() {
   const { nextStep, currentStep, totalSteps, data, updateData } = useOnboarding();
   const [showConfetti, setShowConfetti] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [hasReceivedResponse, setHasReceivedResponse] = useState(false);
+  const [contextStep, setContextStep] = useState(0);
+  const [gatheredContext, setGatheredContext] = useState<Record<string, string>>({});
+  const [isContextComplete, setIsContextComplete] = useState(false);
   
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const systemPrompt = `You are ${RECOMMENDED_COACH.name}, ${RECOMMENDED_COACH.tagline}. ${RECOMMENDED_COACH.promise}
+  const createdCoach = data.createdCoach;
+  const coachName = createdCoach?.name || 'Your Coach';
+  const coachAvatar = createdCoach?.avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop&crop=face';
+  const coachColor = createdCoach?.color || Colors.accent;
+  const coachTopic = createdCoach?.topic || 'general';
+  const coachPersonality = createdCoach?.personality || 'Supportive & Warm';
 
-The user is new to the app and this is their first conversation with an AI coach.
-${data.name ? `Their name is ${data.name}.` : ''}
-${data.helpTopics ? `They mentioned they want help with: ${data.helpTopics}` : ''}
+  const systemPrompt = `You are ${coachName}, a ${coachPersonality.toLowerCase()} AI coach specializing in ${coachTopic}.
+${data.name ? `The user's name is ${data.name}.` : ''}
 
-Keep your response warm, encouraging, and brief (2-3 sentences max).
-Make them feel excited about using the app.
-End with something that makes them want to continue the conversation.`;
+Your job is to have a brief, warm introductory conversation to understand the user better.
+This is their first time using the app.
+
+Current context gathering step: ${contextStep + 1} of 3
+${contextStep === 0 ? "Ask about their current situation/background in " + coachTopic + " in a conversational way." : ""}
+${contextStep === 1 ? "Based on what they shared, ask about their goals - what they hope to achieve." : ""}
+${contextStep === 2 ? "Ask about their experience level to personalize future advice." : ""}
+
+Keep responses warm, brief (2-3 sentences), and conversational.
+After they answer, acknowledge what they shared and naturally lead to the next topic.
+${Object.keys(gatheredContext).length > 0 ? `What you know so far: ${JSON.stringify(gatheredContext)}` : ''}`;
 
   const { messages: agentMessages, sendMessage: sendAgentMessage, status, setMessages } = useRorkAgent({
     tools: {} as Record<string, never>,
@@ -56,36 +73,65 @@ End with something that makes them want to continue the conversation.`;
 
   useEffect(() => {
     if (!isSystemInitialized && systemPrompt) {
+      const greeting = `Hi${data.name ? ` ${data.name}` : ''}! I'm ${coachName}, and I'm excited to be your ${coachTopic.toLowerCase()} coach. Before we dive in, I'd love to learn a bit about you so I can give you the best guidance. ${CONTEXT_QUESTIONS[0].question}`;
+      
       setMessages([
         {
           id: 'system-init',
           role: 'system' as const,
           parts: [{ type: 'text' as const, text: systemPrompt }],
         },
+        {
+          id: 'greeting',
+          role: 'assistant' as const,
+          parts: [{ type: 'text' as const, text: greeting }],
+        },
       ]);
       setIsSystemInitialized(true);
     }
-  }, [systemPrompt, isSystemInitialized, setMessages]);
+  }, [systemPrompt, isSystemInitialized, setMessages, data.name, coachName, coachTopic]);
 
   useEffect(() => {
-    if (status === 'ready' && agentMessages.length > 1 && !hasReceivedResponse) {
-      const lastMessage = agentMessages[agentMessages.length - 1];
-      if (lastMessage.role === 'assistant') {
-        setHasReceivedResponse(true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setShowConfetti(true);
+    if (status === 'ready' && agentMessages.length > 2) {
+      const userMessages = agentMessages.filter(m => m.role === 'user');
+      const newContextStep = Math.min(userMessages.length, 3);
+      
+      if (newContextStep > contextStep) {
+        const lastUserMessage = userMessages[userMessages.length - 1];
+        const textPart = lastUserMessage.parts.find(p => p.type === 'text');
+        const userResponse = textPart?.type === 'text' ? textPart.text : '';
         
-        updateData({ firstChatComplete: true });
+        const contextKey = CONTEXT_QUESTIONS[contextStep]?.key;
+        if (contextKey && userResponse) {
+          setGatheredContext(prev => ({ ...prev, [contextKey]: userResponse }));
+        }
         
-        onboardingStorage.saveUserContext({
-          name: data.name || '',
-          helpTopics: data.helpTopics || '',
-        });
+        setContextStep(newContextStep);
         
-        setTimeout(() => setShowConfetti(false), 3000);
+        if (newContextStep >= 3 && !isContextComplete) {
+          setIsContextComplete(true);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setShowConfetti(true);
+          
+          const finalContext = {
+            ...gatheredContext,
+            [contextKey]: userResponse,
+          };
+          
+          onboardingStorage.saveUserContext({
+            name: data.name || '',
+            background: finalContext.background,
+            goals: finalContext.goals,
+            experienceLevel: finalContext.experienceLevel,
+          });
+          
+          updateData({ firstChatComplete: true });
+          
+          setTimeout(() => setShowConfetti(false), 3000);
+        }
       }
     }
-  }, [status, agentMessages, hasReceivedResponse, data.name, data.helpTopics, updateData]);
+  }, [status, agentMessages, contextStep, isContextComplete, gatheredContext, data.name, updateData]);
 
   const handleSend = useCallback(() => {
     if (!inputText.trim() || isLoading) return;
@@ -116,11 +162,7 @@ End with something that makes them want to continue the conversation.`;
     })
     .filter(m => m.content);
 
-  const suggestedPrompts = [
-    `Hi! I'd love help with ${data.helpTopics || 'my goals'}`,
-    "What can you help me with?",
-    "I'm excited to get started!",
-  ];
+  const progressDots = [0, 1, 2].map(i => i < contextStep);
 
   return (
     <KeyboardAvoidingView 
@@ -140,16 +182,27 @@ End with something that makes them want to continue the conversation.`;
       >
         <View style={styles.header}>
           <View style={styles.coachInfo}>
-            <Image source={{ uri: RECOMMENDED_COACH.avatar }} style={styles.coachAvatar} />
+            <Image source={{ uri: coachAvatar }} style={[styles.coachAvatar, { borderColor: coachColor }]} />
             <View style={styles.coachDetails}>
-              <Text style={styles.coachName}>{RECOMMENDED_COACH.name}</Text>
-              <Text style={styles.coachTagline}>{RECOMMENDED_COACH.tagline}</Text>
+              <Text style={styles.coachName}>{coachName}</Text>
+              <Text style={styles.coachTagline}>{coachTopic} Coach</Text>
             </View>
           </View>
-          <Text style={styles.title}>Try it out!</Text>
-          <Text style={styles.subtitle}>
-            Send a message and experience your first coaching session
-          </Text>
+          
+          <View style={styles.contextProgress}>
+            <Text style={styles.contextLabel}>Getting to know you</Text>
+            <View style={styles.progressDots}>
+              {progressDots.map((filled, i) => (
+                <View 
+                  key={i} 
+                  style={[
+                    styles.dot, 
+                    filled && { backgroundColor: coachColor },
+                  ]} 
+                />
+              ))}
+            </View>
+          </View>
         </View>
 
         <View style={styles.chatContainer}>
@@ -159,21 +212,12 @@ End with something that makes them want to continue the conversation.`;
             contentContainerStyle={styles.messagesContent}
             showsVerticalScrollIndicator={false}
           >
-            {displayMessages.length === 0 && (
-              <View style={styles.emptyChat}>
-                <Sparkles color={Colors.accent} size={32} />
-                <Text style={styles.emptyChatText}>
-                  Say hi to {RECOMMENDED_COACH.name}!
-                </Text>
-              </View>
-            )}
-            
             {displayMessages.map((msg) => (
               <View
                 key={msg.id}
                 style={[
                   styles.messageBubble,
-                  msg.isUser ? styles.userBubble : styles.aiBubble,
+                  msg.isUser ? styles.userBubble : [styles.aiBubble, { backgroundColor: coachColor + '15' }],
                 ]}
               >
                 <Text style={[
@@ -186,67 +230,56 @@ End with something that makes them want to continue the conversation.`;
             ))}
             
             {isLoading && (
-              <View style={[styles.messageBubble, styles.aiBubble, styles.loadingBubble]}>
-                <ActivityIndicator size="small" color={RECOMMENDED_COACH.color} />
+              <View style={[styles.messageBubble, styles.aiBubble, styles.loadingBubble, { backgroundColor: coachColor + '15' }]}>
+                <ActivityIndicator size="small" color={coachColor} />
                 <Text style={styles.loadingText}>Thinking...</Text>
               </View>
             )}
           </ScrollView>
 
-          {displayMessages.length === 0 && !isLoading && (
-            <View style={styles.suggestionsContainer}>
-              {suggestedPrompts.map((prompt, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.suggestionChip}
-                  onPress={() => {
-                    setInputText(prompt);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.suggestionText}>{prompt}</Text>
-                </TouchableOpacity>
-              ))}
+          {!isContextComplete && (
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Type your response..."
+                placeholderTextColor={Colors.textMuted}
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={500}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  inputText.trim() && !isLoading && { backgroundColor: coachColor },
+                ]}
+                onPress={handleSend}
+                disabled={!inputText.trim() || isLoading}
+                activeOpacity={0.8}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={Colors.textMuted} />
+                ) : (
+                  <Send
+                    color={inputText.trim() ? Colors.white : Colors.textMuted}
+                    size={20}
+                  />
+                )}
+              </TouchableOpacity>
             </View>
           )}
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Type a message..."
-              placeholderTextColor={Colors.textMuted}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={300}
-              editable={!hasReceivedResponse}
-            />
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                inputText.trim() && !isLoading && { backgroundColor: RECOMMENDED_COACH.color },
-              ]}
-              onPress={handleSend}
-              disabled={!inputText.trim() || isLoading || hasReceivedResponse}
-              activeOpacity={0.8}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color={Colors.textMuted} />
-              ) : (
-                <Send
-                  color={inputText.trim() ? Colors.white : Colors.textMuted}
-                  size={20}
-                />
-              )}
-            </TouchableOpacity>
-          </View>
         </View>
 
-        {hasReceivedResponse && (
+        {isContextComplete && (
           <Animated.View style={styles.successContainer}>
-            <Text style={styles.successText}>Amazing! You just had your first AI coaching moment ✨</Text>
+            <View style={styles.successIcon}>
+              <Sparkles color={coachColor} size={24} />
+            </View>
+            <Text style={styles.successText}>
+              Great! {coachName} now knows you better and will personalize your experience.
+            </Text>
             <TouchableOpacity
-              style={styles.continueButton}
+              style={[styles.continueButton, { backgroundColor: coachColor }]}
               onPress={handleContinue}
               activeOpacity={0.8}
             >
@@ -279,13 +312,14 @@ const styles = StyleSheet.create({
   coachInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   coachAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     marginRight: 12,
+    borderWidth: 3,
   },
   coachDetails: {
     flex: 1,
@@ -300,16 +334,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.navy,
-    marginBottom: 4,
+  contextProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 12,
   },
-  subtitle: {
-    fontSize: 15,
+  contextLabel: {
+    fontSize: 13,
     color: Colors.textSecondary,
-    lineHeight: 22,
+    fontWeight: '500',
+  },
+  progressDots: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.borderLight,
   },
   chatContainer: {
     flex: 1,
@@ -329,16 +375,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 8,
   },
-  emptyChat: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyChatText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    marginTop: 12,
-  },
   messageBubble: {
     maxWidth: '85%',
     paddingHorizontal: 16,
@@ -352,7 +388,6 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   aiBubble: {
-    backgroundColor: Colors.cardAlt,
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
   },
@@ -374,24 +409,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginLeft: 8,
-  },
-  suggestionsContainer: {
-    paddingHorizontal: 12,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  suggestionChip: {
-    backgroundColor: Colors.accentLight,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.accent + '30',
-  },
-  suggestionText: {
-    fontSize: 14,
-    color: Colors.accent,
-    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -423,20 +440,31 @@ const styles = StyleSheet.create({
   successContainer: {
     marginTop: 16,
     alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    padding: 20,
+  },
+  successIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.accentLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   successText: {
-    fontSize: 16,
+    fontSize: 15,
     color: Colors.navy,
-    fontWeight: '600',
+    fontWeight: '500',
     textAlign: 'center',
     marginBottom: 16,
+    lineHeight: 22,
   },
   continueButton: {
-    backgroundColor: Colors.navy,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
     borderRadius: 14,
-    shadowColor: Colors.navy,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

@@ -3,9 +3,8 @@ import { View, ActivityIndicator, StyleSheet, Dimensions } from 'react-native';
 import { useOnboarding } from './context';
 import WelcomeStep from './steps/WelcomeStep';
 import ProfileStep from './steps/ProfileStep';
+import CoachCreationStep from './steps/CoachCreationStep';
 import TutorialStep from './steps/TutorialStep';
-
-import PersonalizeStep from './steps/PersonalizeStep';
 import CompleteStep from './steps/CompleteStep';
 import Colors from '@/constants/colors';
 import ConfettiEffect from '@/components/onboarding/ConfettiEffect';
@@ -19,9 +18,9 @@ function StepRenderer({ step }: { step: number }) {
     case 2:
       return <ProfileStep />;
     case 3:
-      return <TutorialStep />;
+      return <CoachCreationStep />;
     case 4:
-      return <PersonalizeStep />;
+      return <TutorialStep />;
     case 5:
       return <CompleteStep />;
     default:

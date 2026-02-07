@@ -9,19 +9,30 @@ const STORAGE_KEYS = {
   USER_CONTEXT: '@user_context',
 };
 
+export interface CreatedCoach {
+  id: string;
+  name: string;
+  topic: string;
+  personality: string;
+  avatar: string;
+  color: string;
+}
+
 export interface OnboardingData {
   name?: string;
-  goal?: 'learn' | 'improve' | 'explore';
-  practiceTime?: 'morning' | 'afternoon' | 'evening';
   xp?: number;
-  helpTopics?: string;
   firstChatComplete?: boolean;
+  createdCoach?: CreatedCoach;
 }
 
 export interface UserContext {
   name: string;
-  helpTopics: string;
+  background?: string;
+  goals?: string;
+  experienceLevel?: string;
 }
+
+
 
 export const onboardingStorage = {
   async isComplete(): Promise<boolean> {

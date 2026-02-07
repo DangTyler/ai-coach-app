@@ -22,7 +22,8 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [editingName, setEditingName] = useState('');
-  const [editingTopics, setEditingTopics] = useState('');
+  const [editingBackground, setEditingBackground] = useState('');
+  const [editingGoals, setEditingGoals] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -33,7 +34,8 @@ export default function SettingsScreen() {
     const context = await onboardingStorage.getUserContext();
     if (context) {
       setEditingName(context.name);
-      setEditingTopics(context.helpTopics);
+      setEditingBackground(context.background || '');
+      setEditingGoals(context.goals || '');
     }
   };
 
@@ -42,17 +44,23 @@ export default function SettingsScreen() {
     setHasChanges(true);
   };
 
-  const handleTopicsChange = (text: string) => {
-    setEditingTopics(text);
+  const handleBackgroundChange = (text: string) => {
+    setEditingBackground(text);
+    setHasChanges(true);
+  };
+
+  const handleGoalsChange = (text: string) => {
+    setEditingGoals(text);
     setHasChanges(true);
   };
 
   const handleSaveContext = async () => {
     await onboardingStorage.saveUserContext({
       name: editingName,
-      helpTopics: editingTopics,
+      background: editingBackground,
+      goals: editingGoals,
     });
-    console.log('[Settings] User context saved:', { name: editingName, helpTopics: editingTopics });
+    console.log('[Settings] User context saved:', { name: editingName, background: editingBackground, goals: editingGoals });
     setHasChanges(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('Saved', 'Your profile has been updated!');
@@ -147,13 +155,28 @@ export default function SettingsScreen() {
             <View style={styles.contextField}>
               <View style={styles.contextLabelRow}>
                 <Sparkles color={Colors.accent} size={18} />
-                <Text style={styles.contextLabel}>Help Topics</Text>
+                <Text style={styles.contextLabel}>Background</Text>
               </View>
               <TextInput
                 style={[styles.contextInput, styles.contextInputMulti]}
-                value={editingTopics}
-                onChangeText={handleTopicsChange}
-                placeholder="What do you want help with?"
+                value={editingBackground}
+                onChangeText={handleBackgroundChange}
+                placeholder="Your current situation or background"
+                placeholderTextColor={Colors.textMuted}
+                multiline
+              />
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.contextField}>
+              <View style={styles.contextLabelRow}>
+                <Sparkles color={Colors.accent} size={18} />
+                <Text style={styles.contextLabel}>Goals</Text>
+              </View>
+              <TextInput
+                style={[styles.contextInput, styles.contextInputMulti]}
+                value={editingGoals}
+                onChangeText={handleGoalsChange}
+                placeholder="What are you hoping to achieve?"
                 placeholderTextColor={Colors.textMuted}
                 multiline
               />
