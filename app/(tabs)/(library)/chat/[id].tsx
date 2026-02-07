@@ -1,6 +1,5 @@
 import { useRorkAgent } from "@rork-ai/toolkit-sdk";
 import { Audio } from "expo-av";
-import { AndroidOutputFormat, AndroidAudioEncoder, IOSOutputFormat, IOSAudioQuality } from 'expo-av/build/Audio/RecordingConstants';
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { useLocalSearchParams, Stack } from "expo-router";
@@ -406,28 +405,7 @@ Personality & Approach:
         });
         
         const recording = new Audio.Recording();
-        await recording.prepareToRecordAsync({
-          android: {
-            extension: '.m4a',
-            outputFormat: AndroidOutputFormat.MPEG_4,
-            audioEncoder: AndroidAudioEncoder.AAC,
-            sampleRate: 44100,
-            numberOfChannels: 1,
-            bitRate: 128000,
-          },
-          ios: {
-            extension: '.wav',
-            outputFormat: IOSOutputFormat.LINEARPCM,
-            audioQuality: IOSAudioQuality.HIGH,
-            sampleRate: 44100,
-            numberOfChannels: 1,
-            bitRate: 128000,
-            linearPCMBitDepth: 16,
-            linearPCMIsBigEndian: false,
-            linearPCMIsFloat: false,
-          },
-          web: {},
-        });
+        await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
         
         await recording.startAsync();
         recordingRef.current = recording;
