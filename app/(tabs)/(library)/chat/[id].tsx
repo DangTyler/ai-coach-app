@@ -1,8 +1,10 @@
 import { useRorkAgent } from "@rork-ai/toolkit-sdk";
 import { Audio } from "expo-av";
+import { AndroidOutputFormat, AndroidAudioEncoder, IOSOutputFormat, IOSAudioQuality } from 'expo-av/build/Audio/RecordingConstants';
+import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { useLocalSearchParams, Stack } from "expo-router";
-import { Send, SlidersHorizontal, X, Mic, Volume2, Square } from "lucide-react-native";
+import { Send, SlidersHorizontal, X, Mic, Volume2, Square, AudioLines, Zap } from "lucide-react-native";
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
@@ -21,6 +23,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Easing,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -29,6 +32,7 @@ import { useChats } from "@/contexts/ChatContext";
 import { useCoaches } from "@/contexts/CoachContext";
 import { defaultContextCards, ContextCard } from "@/mocks/chats";
 import { onboardingStorage, UserContext } from "@/app/onboarding/storage";
+import { voiceSettingsStorage } from "@/store/voiceSettings";
 
 const { height: screenHeight } = Dimensions.get("window");
 
@@ -128,16 +132,94 @@ Personality & Approach:
   const [isSystemInitialized, setIsSystemInitialized] = useState(false);
   const [lastSyncedMessageCount, setLastSyncedMessageCount] = useState(0);
   
-  // Voice states
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [autoSend, setAutoSend] = useState(false);
+  const [voiceConvoMode, setVoiceConvoMode] = useState(false);
+  const [isVoiceConvoActive, setIsVoiceConvoActive] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseOpacity = useRef(new Animated.Value(0.6)).current;
+  const pendingAutoSendRef = useRef<string | null>(null);
 
   const isLoading = status === "streaming" || status === "submitted";
+
+  useEffect(() => {
+    const loadVoiceSettings = async () => {
+      const settings = await voiceSettingsStorage.get();
+      setAutoSend(settings.autoSend);
+      setVoiceConvoMode(settings.voiceConversationMode);
+    };
+    loadVoiceSettings();
+  }, []);
+
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+
+      const pulseLoop = Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(pulseAnim, {
+              toValue: 1.3,
+              duration: 800,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseOpacity, {
+              toValue: 0,
+              duration: 800,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 0,
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseOpacity, {
+              toValue: 0.6,
+              duration: 0,
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      );
+      pulseLoop.start();
+
+      return () => {
+        pulseLoop.stop();
+        pulseAnim.setValue(1);
+        pulseOpacity.setValue(0.6);
+        if (recordingTimerRef.current) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+      };
+    } else {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    }
+  }, [isRecording, pulseAnim, pulseOpacity]);
+
+  const formatDuration = useCallback((seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, []);
 
   const displayMessages = useMemo((): DisplayMessage[] => {
     const msgs: DisplayMessage[] = [];
@@ -293,9 +375,9 @@ Personality & Approach:
     );
   }, []);
 
-  // Voice recording functions
   const startRecording = useCallback(async () => {
     try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (Platform.OS === 'web') {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -310,7 +392,7 @@ Personality & Approach:
         mediaRecorderRef.current = mediaRecorder;
         mediaRecorder.start();
         setIsRecording(true);
-        console.log('Web recording started');
+        console.log('[Voice] Web recording started');
       } else {
         const { status } = await Audio.requestPermissionsAsync();
         if (status !== 'granted') {
@@ -324,27 +406,64 @@ Personality & Approach:
         });
         
         const recording = new Audio.Recording();
-        await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        await recording.prepareToRecordAsync({
+          android: {
+            extension: '.m4a',
+            outputFormat: AndroidOutputFormat.MPEG_4,
+            audioEncoder: AndroidAudioEncoder.AAC,
+            sampleRate: 44100,
+            numberOfChannels: 1,
+            bitRate: 128000,
+          },
+          ios: {
+            extension: '.wav',
+            outputFormat: IOSOutputFormat.LINEARPCM,
+            audioQuality: IOSAudioQuality.HIGH,
+            sampleRate: 44100,
+            numberOfChannels: 1,
+            bitRate: 128000,
+            linearPCMBitDepth: 16,
+            linearPCMIsBigEndian: false,
+            linearPCMIsFloat: false,
+          },
+          web: {},
+        });
         
         await recording.startAsync();
         recordingRef.current = recording;
         setIsRecording(true);
-        console.log('Native recording started');
+        console.log('[Voice] Native recording started');
       }
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      console.error('[Voice] Failed to start recording:', error);
       Alert.alert('Error', 'Failed to start recording. Please try again.');
     }
   }, []);
+
+  const handleTranscriptionResult = useCallback((text: string) => {
+    console.log('[Voice] Transcription result:', text);
+    if (!text) return;
+
+    if (autoSend || isVoiceConvoActive) {
+      pendingAutoSendRef.current = text;
+    } else {
+      setInputText(prev => prev + (prev ? ' ' : '') + text);
+    }
+  }, [autoSend, isVoiceConvoActive]);
+
+  useEffect(() => {
+    if (pendingAutoSendRef.current && !isLoading && !isTranscribing) {
+      const text = pendingAutoSendRef.current;
+      pendingAutoSendRef.current = null;
+      handleSendMessage(text);
+    }
+  }, [isLoading, isTranscribing, handleSendMessage]);
 
   const stopRecording = useCallback(async () => {
     try {
       setIsRecording(false);
       setIsTranscribing(true);
-      
-      let audioBlob: Blob;
-      let fileName: string;
-      let mimeType: string;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
       if (Platform.OS === 'web') {
         const mediaRecorder = mediaRecorderRef.current;
@@ -359,11 +478,26 @@ Personality & Approach:
         });
         
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
-        audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        fileName = 'recording.webm';
-        mimeType = 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         mediaRecorderRef.current = null;
-        console.log('Web recording stopped, blob size:', audioBlob.size);
+        console.log('[Voice] Web recording stopped, blob size:', audioBlob.size);
+        
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+        
+        const response = await fetch('https://toolkit.rork.com/stt/transcribe/', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Voice] STT API error:', response.status, errorText);
+          throw new Error('Transcription failed');
+        }
+        
+        const result = await response.json();
+        handleTranscriptionResult(result.text || '');
       } else {
         const recording = recordingRef.current;
         if (!recording) {
@@ -375,6 +509,8 @@ Personality & Approach:
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
         
         const uri = recording.getURI();
+        recordingRef.current = null;
+        
         if (!uri) {
           setIsTranscribing(false);
           return;
@@ -382,68 +518,40 @@ Personality & Approach:
         
         const uriParts = uri.split('.');
         const fileType = uriParts[uriParts.length - 1];
-        fileName = `recording.${fileType}`;
-        mimeType = `audio/${fileType}`;
+        console.log('[Voice] Native recording stopped, uri:', uri, 'type:', fileType);
         
-        // For native, we need to create form data differently
         const formData = new FormData();
         formData.append('audio', {
           uri,
-          name: fileName,
-          type: mimeType,
+          name: `recording.${fileType}`,
+          type: `audio/${fileType}`,
         } as unknown as Blob);
         
-        recordingRef.current = null;
-        console.log('Native recording stopped, uri:', uri);
-        
-        // Send to STT API
         const response = await fetch('https://toolkit.rork.com/stt/transcribe/', {
           method: 'POST',
           body: formData,
         });
         
         if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[Voice] STT API error:', response.status, errorText);
           throw new Error('Transcription failed');
         }
         
         const result = await response.json();
-        console.log('Transcription result:', result);
-        
-        if (result.text) {
-          setInputText(prev => prev + (prev ? ' ' : '') + result.text);
-        }
-        
-        setIsTranscribing(false);
-        return;
-      }
-      
-      // Web path - send blob to STT API
-      const formData = new FormData();
-      formData.append('audio', audioBlob, fileName);
-      
-      const response = await fetch('https://toolkit.rork.com/stt/transcribe/', {
-        method: 'POST',
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Transcription failed');
-      }
-      
-      const result = await response.json();
-      console.log('Transcription result:', result);
-      
-      if (result.text) {
-        setInputText(prev => prev + (prev ? ' ' : '') + result.text);
+        handleTranscriptionResult(result.text || '');
       }
       
       setIsTranscribing(false);
     } catch (error) {
-      console.error('Failed to stop recording:', error);
+      console.error('[Voice] Failed to stop recording:', error);
       setIsTranscribing(false);
+      if (isVoiceConvoActive) {
+        setIsVoiceConvoActive(false);
+      }
       Alert.alert('Error', 'Failed to transcribe audio. Please try again.');
     }
-  }, []);
+  }, [handleTranscriptionResult, isVoiceConvoActive]);
 
   const handleMicPress = useCallback(() => {
     if (isRecording) {
@@ -453,8 +561,26 @@ Personality & Approach:
     }
   }, [isRecording, startRecording, stopRecording]);
 
-  // Text-to-speech functions
-  const speakMessage = useCallback(async (messageId: string, text: string) => {
+  const toggleVoiceConvoMode = useCallback(() => {
+    if (isVoiceConvoActive) {
+      setIsVoiceConvoActive(false);
+      if (isRecording) {
+        stopRecording();
+      }
+      if (isSpeaking) {
+        Speech.stop();
+        setIsSpeaking(false);
+        setSpeakingMessageId(null);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } else {
+      setIsVoiceConvoActive(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      startRecording();
+    }
+  }, [isVoiceConvoActive, isRecording, isSpeaking, stopRecording, startRecording]);
+
+  const speakMessage = useCallback(async (messageId: string, text: string, isVoiceConvo?: boolean) => {
     if (isSpeaking && speakingMessageId === messageId) {
       Speech.stop();
       setIsSpeaking(false);
@@ -473,6 +599,11 @@ Personality & Approach:
       onDone: () => {
         setIsSpeaking(false);
         setSpeakingMessageId(null);
+        if (isVoiceConvo) {
+          setTimeout(() => {
+            startRecording();
+          }, 400);
+        }
       },
       onStopped: () => {
         setIsSpeaking(false);
@@ -483,16 +614,42 @@ Personality & Approach:
         setSpeakingMessageId(null);
       },
     });
-  }, [isSpeaking, speakingMessageId]);
+  }, [isSpeaking, speakingMessageId, startRecording]);
 
-  // Cleanup on unmount
+  useEffect(() => {
+    if (!isVoiceConvoActive) return;
+    if (isLoading || isTranscribing || isRecording || isSpeaking) return;
+    
+    const lastMsg = displayMessages[displayMessages.length - 1];
+    if (lastMsg && !lastMsg.isUser && !lastMsg.isStreaming) {
+      speakMessage(lastMsg.id, lastMsg.content, true);
+    }
+  }, [isVoiceConvoActive, isLoading, isTranscribing, isRecording, isSpeaking, displayMessages, speakMessage]);
+
   useEffect(() => {
     return () => {
       if (isSpeaking) {
         Speech.stop();
       }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
     };
   }, [isSpeaking]);
+
+  const toggleAutoSend = useCallback(async () => {
+    const newVal = !autoSend;
+    setAutoSend(newVal);
+    await voiceSettingsStorage.save({ autoSend: newVal });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [autoSend]);
+
+  const toggleVoiceConvoSetting = useCallback(async () => {
+    const newVal = !voiceConvoMode;
+    setVoiceConvoMode(newVal);
+    await voiceSettingsStorage.save({ voiceConversationMode: newVal });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }, [voiceConvoMode]);
 
   if (!coach) {
     return (
@@ -609,15 +766,79 @@ Personality & Approach:
         />
       )}
 
+      {isVoiceConvoActive && (
+        <View style={styles.voiceConvoOverlay}>
+          <View style={styles.voiceConvoContent}>
+            <View style={styles.voiceConvoIndicator}>
+              {isRecording ? (
+                <View style={styles.voiceConvoPulseContainer}>
+                  <Animated.View
+                    style={[
+                      styles.voiceConvoPulseRing,
+                      { backgroundColor: coach.color + '30', transform: [{ scale: pulseAnim }], opacity: pulseOpacity },
+                    ]}
+                  />
+                  <View style={[styles.voiceConvoMicCircle, { backgroundColor: coach.color }]}> 
+                    <AudioLines color={Colors.white} size={32} />
+                  </View>
+                </View>
+              ) : isTranscribing ? (
+                <View style={[styles.voiceConvoMicCircle, { backgroundColor: Colors.textSecondary }]}> 
+                  <ActivityIndicator size="large" color={Colors.white} />
+                </View>
+              ) : isSpeaking ? (
+                <View style={[styles.voiceConvoMicCircle, { backgroundColor: coach.color }]}> 
+                  <Volume2 color={Colors.white} size={32} />
+                </View>
+              ) : isLoading ? (
+                <View style={[styles.voiceConvoMicCircle, { backgroundColor: Colors.textMuted }]}> 
+                  <ActivityIndicator size="large" color={Colors.white} />
+                </View>
+              ) : (
+                <View style={[styles.voiceConvoMicCircle, { backgroundColor: Colors.border }]}> 
+                  <Mic color={Colors.textSecondary} size={32} />
+                </View>
+              )}
+            </View>
+            <Text style={styles.voiceConvoStatus}>
+              {isRecording ? `Listening... ${formatDuration(recordingDuration)}` : isTranscribing ? 'Processing...' : isSpeaking ? `${coach.name} is speaking...` : isLoading ? 'Thinking...' : 'Starting...'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.voiceConvoStopButton, { borderColor: coach.color }]}
+              onPress={toggleVoiceConvoMode}
+              activeOpacity={0.8}
+            >
+              <Square color={coach.color} size={16} fill={coach.color} />
+              <Text style={[styles.voiceConvoStopText, { color: coach.color }]}>End Conversation</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <View style={[styles.inputContainer, { paddingBottom: insets.bottom + 8 }]}>
+        {isRecording && !isVoiceConvoActive && (
+          <View style={styles.recordingBar}>
+            <View style={styles.recordingBarLeft}>
+              <Animated.View
+                style={[
+                  styles.recordingDot,
+                  { backgroundColor: '#EF4444', transform: [{ scale: pulseAnim }], opacity: pulseOpacity },
+                ]}
+              />
+              <View style={[styles.recordingDotInner, { backgroundColor: '#EF4444' }]} />
+              <Text style={styles.recordingTimer}>{formatDuration(recordingDuration)}</Text>
+            </View>
+            <Text style={styles.recordingHint}>Tap mic to stop</Text>
+          </View>
+        )}
         <View style={styles.inputWrapper}>
           <TouchableOpacity
             style={[
               styles.micButton,
-              isRecording && styles.micButtonRecording,
+              isRecording && !isVoiceConvoActive && styles.micButtonRecording,
             ]}
             onPress={handleMicPress}
-            disabled={isTranscribing || isLoading}
+            disabled={isTranscribing || isLoading || isVoiceConvoActive}
             activeOpacity={0.7}
           >
             {isTranscribing ? (
@@ -636,8 +857,25 @@ Personality & Approach:
             onChangeText={setInputText}
             multiline
             maxLength={500}
-            editable={!isRecording}
+            editable={!isRecording && !isVoiceConvoActive}
           />
+          {voiceConvoMode && (
+            <TouchableOpacity
+              style={[
+                styles.voiceConvoButton,
+                isVoiceConvoActive && { backgroundColor: coach.color },
+              ]}
+              onPress={toggleVoiceConvoMode}
+              disabled={isTranscribing}
+              activeOpacity={0.7}
+            >
+              <Zap
+                color={isVoiceConvoActive ? Colors.white : coach.color}
+                size={18}
+                fill={isVoiceConvoActive ? Colors.white : 'none'}
+              />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[
               styles.sendButton,
@@ -696,6 +934,39 @@ Personality & Approach:
               style={styles.sheetContent}
               showsVerticalScrollIndicator={false}
             >
+              <View style={styles.voiceSettingsSection}>
+                <Text style={styles.voiceSettingsTitle}>Voice Settings</Text>
+                <View style={styles.voiceSettingRow}>
+                  <View style={styles.voiceSettingInfo}>
+                    <Send color={coach.color} size={16} />
+                    <Text style={styles.voiceSettingLabel}>Auto-send after recording</Text>
+                  </View>
+                  <Switch
+                    value={autoSend}
+                    onValueChange={toggleAutoSend}
+                    trackColor={{ false: Colors.border, true: coach.color + '60' }}
+                    thumbColor={autoSend ? coach.color : Colors.white}
+                  />
+                </View>
+                <View style={styles.voiceSettingRow}>
+                  <View style={styles.voiceSettingInfo}>
+                    <Zap color={coach.color} size={16} />
+                    <Text style={styles.voiceSettingLabel}>Voice conversation mode</Text>
+                  </View>
+                  <Switch
+                    value={voiceConvoMode}
+                    onValueChange={toggleVoiceConvoSetting}
+                    trackColor={{ false: Colors.border, true: coach.color + '60' }}
+                    thumbColor={voiceConvoMode ? coach.color : Colors.white}
+                  />
+                </View>
+                {voiceConvoMode && (
+                  <Text style={styles.voiceSettingHint}>
+                    Tap the bolt icon to start a hands-free voice loop
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.voiceSettingsTitle}>Context Cards</Text>
               {contextCards.map((card) => (
                 <View key={card.id} style={styles.contextCard}>
                   <View style={styles.contextCardHeader}>
@@ -872,6 +1143,148 @@ const styles = StyleSheet.create({
   },
   micButtonRecording: {
     backgroundColor: "#EF4444",
+  },
+  voiceConvoButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: Colors.borderLight,
+    marginRight: 4,
+  },
+  recordingBar: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  recordingBarLeft: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+  },
+  recordingDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    position: "absolute" as const,
+  },
+  recordingDotInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginLeft: 5,
+  },
+  recordingTimer: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: "#EF4444",
+    marginLeft: 12,
+  },
+  recordingHint: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  voiceConvoOverlay: {
+    position: "absolute" as const,
+    left: 0,
+    right: 0,
+    bottom: 120,
+    alignItems: "center" as const,
+    zIndex: 50,
+  },
+  voiceConvoContent: {
+    alignItems: "center" as const,
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 32,
+    shadowColor: Colors.navy,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+    marginHorizontal: 24,
+    width: 280,
+  },
+  voiceConvoIndicator: {
+    marginBottom: 16,
+  },
+  voiceConvoPulseContainer: {
+    width: 80,
+    height: 80,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  voiceConvoPulseRing: {
+    position: "absolute" as const,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  voiceConvoMicCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  voiceConvoStatus: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: Colors.navy,
+    textAlign: "center" as const,
+    marginBottom: 20,
+  },
+  voiceConvoStopButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  voiceConvoStopText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    marginLeft: 8,
+  },
+  voiceSettingsSection: {
+    marginBottom: 20,
+  },
+  voiceSettingsTitle: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.textMuted,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  voiceSettingRow: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    paddingVertical: 10,
+  },
+  voiceSettingInfo: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    flex: 1,
+    marginRight: 12,
+  },
+  voiceSettingLabel: {
+    fontSize: 15,
+    color: Colors.navy,
+    fontWeight: "500" as const,
+    marginLeft: 10,
+  },
+  voiceSettingHint: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 4,
+    marginLeft: 26,
   },
   sendButton: {
     width: 42,
