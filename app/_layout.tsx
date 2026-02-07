@@ -2,6 +2,7 @@
 // force rebundle v2
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
+import { trpc, trpcClient } from "@/lib/trpc";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -88,14 +89,16 @@ function RootLayoutWithOnboarding() {
 
 export default function RootLayout() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <GestureHandlerRootView>
         <CoachProvider>
           <ChatProvider>
             <RootLayoutWithOnboarding />
           </ChatProvider>
         </CoachProvider>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
+        </GestureHandlerRootView>
+      </QueryClientProvider>
+    </trpc.Provider>
   );
 }
