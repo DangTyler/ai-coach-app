@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight, User, Sparkles } from "lucide-react-native";
+import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight, User, Sparkles, LogOut, Mail } from "lucide-react-native";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from 'expo-haptics';
 
 import Colors from "@/constants/colors";
+import { useAuth } from "@/contexts/AuthContext";
 import { onboardingStorage } from "@/app/onboarding/storage";
 
 export default function SettingsScreen() {
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
   const [editingBackground, setEditingBackground] = useState('');
   const [editingGoals, setEditingGoals] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
+  const { user, logout, isAuthenticated } = useAuth();
 
   useEffect(() => {
     loadUserContext();
@@ -225,6 +227,62 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {isAuthenticated && user && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <View style={styles.card}>
+              <View style={styles.accountHeader}>
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarInitial}>
+                    {user.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.accountInfo}>
+                  <Text style={styles.accountName}>{user.name}</Text>
+                  <View style={styles.accountEmailRow}>
+                    <Mail color={Colors.textMuted} size={14} />
+                    <Text style={styles.accountEmail}>{user.email}</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.settingRow}
+                onPress={() => {
+                  Alert.alert(
+                    'Sign Out',
+                    'Are you sure you want to sign out?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Sign Out',
+                        style: 'destructive',
+                        onPress: async () => {
+                          await logout();
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        },
+                      },
+                    ]
+                  );
+                }}
+                activeOpacity={0.7}
+                testID="sign-out-button"
+              >
+                <View style={styles.settingLeft}>
+                  <View style={[styles.iconContainer, { backgroundColor: '#FEF2F2' }]}>
+                    <LogOut color="#EF4444" size={20} />
+                  </View>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={[styles.settingLabel, { color: '#EF4444' }]}>Sign Out</Text>
+                    <Text style={styles.settingDescription}>Sign out of your account</Text>
+                  </View>
+                </View>
+                <ChevronRight color={Colors.textMuted} size={20} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           <View style={styles.card}>
@@ -402,5 +460,42 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  accountHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  avatarInitial: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.white,
+  },
+  accountInfo: {
+    flex: 1,
+  },
+  accountName: {
+    fontSize: 17,
+    fontWeight: '600' as const,
+    color: Colors.navy,
+    marginBottom: 2,
+  },
+  accountEmailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  accountEmail: {
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
 });

@@ -1,5 +1,5 @@
 // root layout
-// force rebundle v2
+// force rebundle v3
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { trpc, trpcClient } from "@/lib/trpc";
@@ -7,11 +7,11 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ChatProvider } from "@/contexts/ChatContext";
 import { CoachProvider } from "@/contexts/CoachContext";
 import { onboardingStorage } from "@/app/onboarding/storage";
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
@@ -19,23 +19,25 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
+      <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="settings" 
-        options={{ 
+      <Stack.Screen
+        name="settings"
+        options={{
           headerShown: false,
-          presentation: 'modal',
-        }} 
+          presentation: "modal",
+        }}
       />
     </Stack>
   );
 }
 
-function RootLayoutWithOnboarding() {
+function RootLayoutWithAuth() {
   const router = useRouter();
   const segments = useSegments();
-  const [isLoading, setIsLoading] = useState(true);
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const [isCheckingOnboarding, setIsCheckingOnboarding] = useState(true);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
 
   useEffect(() => {
@@ -43,44 +45,55 @@ function RootLayoutWithOnboarding() {
   }, []);
 
   useEffect(() => {
-    const handleNavigation = async () => {
-      if (!isLoading) {
-        const inOnboarding = segments[0] === 'onboarding';
-        
-        // Re-check storage in case it was updated
-        const completed = await onboardingStorage.isComplete();
-        
-        if (completed !== isOnboardingComplete) {
-          setIsOnboardingComplete(completed);
-          return; // Let the next effect run handle navigation
+    if (isAuthLoading || isCheckingOnboarding) return;
+
+    const inAuth = segments[0] === "auth";
+    const inOnboarding = segments[0] === "onboarding";
+
+    const navigate = async () => {
+      const completed = await onboardingStorage.isComplete();
+
+      if (completed !== isOnboardingComplete) {
+        setIsOnboardingComplete(completed);
+        return;
+      }
+
+      if (!isAuthenticated && !inAuth) {
+        console.log("[Nav] Not authenticated, redirecting to auth");
+        router.replace("/auth/login" as any);
+      } else if (isAuthenticated && inAuth) {
+        if (!completed) {
+          console.log("[Nav] Authenticated, onboarding incomplete, redirecting to onboarding");
+          router.replace("/onboarding" as any);
+        } else {
+          console.log("[Nav] Authenticated, redirecting to tabs");
+          router.replace("/(tabs)" as any);
         }
-        
-        if (!completed && !inOnboarding) {
-          // Redirect to onboarding if not complete
-          router.replace('/onboarding' as any);
-        } else if (completed && inOnboarding) {
-          // Redirect to main app if onboarding is complete
-          router.replace('/(tabs)' as any);
-        }
+      } else if (isAuthenticated && !completed && !inOnboarding && !inAuth) {
+        console.log("[Nav] Onboarding not complete, redirecting");
+        router.replace("/onboarding" as any);
+      } else if (isAuthenticated && completed && inOnboarding) {
+        console.log("[Nav] Onboarding complete, redirecting to tabs");
+        router.replace("/(tabs)" as any);
       }
     };
-    
-    handleNavigation();
-  }, [isLoading, isOnboardingComplete, segments]);
+
+    navigate();
+  }, [isAuthLoading, isCheckingOnboarding, isAuthenticated, isOnboardingComplete, segments, router]);
 
   const checkOnboardingStatus = async () => {
     try {
       const completed = await onboardingStorage.isComplete();
       setIsOnboardingComplete(completed);
     } catch (error) {
-      console.error('Error checking onboarding status:', error);
+      console.error("[Nav] Error checking onboarding status:", error);
     } finally {
-      setIsLoading(false);
+      setIsCheckingOnboarding(false);
       SplashScreen.hideAsync();
     }
   };
 
-  if (isLoading) {
+  if (isAuthLoading || isCheckingOnboarding) {
     return null;
   }
 
@@ -92,11 +105,13 @@ export default function RootLayout() {
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView>
-        <CoachProvider>
-          <ChatProvider>
-            <RootLayoutWithOnboarding />
-          </ChatProvider>
-        </CoachProvider>
+          <AuthProvider>
+            <CoachProvider>
+              <ChatProvider>
+                <RootLayoutWithAuth />
+              </ChatProvider>
+            </CoachProvider>
+          </AuthProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
     </trpc.Provider>
