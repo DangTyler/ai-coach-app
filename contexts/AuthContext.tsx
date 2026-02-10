@@ -48,6 +48,10 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const meQuery = trpc.auth.me.useQuery(undefined, {
     enabled: !!token && !isAuthenticated,
     retry: false,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   useEffect(() => {
