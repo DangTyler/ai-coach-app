@@ -6,6 +6,21 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { setAuthToken } from '@/lib/auth-token';
 import { trpc } from '@/lib/trpc';
 
+function extractErrorMessage(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  if (err instanceof Error) {
+    if (err.message.includes('Unable to connect')) return err.message;
+    if (err.message.includes('temporarily unavailable')) return err.message;
+    if (err.message.includes('unexpected response')) return err.message;
+    if (err.message.includes('busy')) return err.message;
+    if (err.message === 'Failed to fetch' || err.message === 'Network request failed') {
+      return 'Unable to connect to the server. Please check your connection and try again.';
+    }
+    return err.message;
+  }
+  return fallback;
+}
+
 const AUTH_TOKEN_KEY = 'auth_token';
 
 interface User {
@@ -90,21 +105,31 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await loginMutation.mutateAsync({ email, password });
-    await saveSession(
-      { id: result.id, email: result.email, name: result.name },
-      result.token
-    );
-    return result;
+    try {
+      const result = await loginMutation.mutateAsync({ email, password });
+      await saveSession(
+        { id: result.id, email: result.email, name: result.name },
+        result.token
+      );
+      return result;
+    } catch (err) {
+      console.log('[Auth] Login error:', err);
+      throw new Error(extractErrorMessage(err, 'Login failed. Please try again.'));
+    }
   }, [loginMutation]);
 
   const register = useCallback(async (email: string, password: string, name: string) => {
-    const result = await registerMutation.mutateAsync({ email, password, name });
-    await saveSession(
-      { id: result.id, email: result.email, name: result.name },
-      result.token
-    );
-    return result;
+    try {
+      const result = await registerMutation.mutateAsync({ email, password, name });
+      await saveSession(
+        { id: result.id, email: result.email, name: result.name },
+        result.token
+      );
+      return result;
+    } catch (err) {
+      console.log('[Auth] Register error:', err);
+      throw new Error(extractErrorMessage(err, 'Registration failed. Please try again.'));
+    }
   }, [registerMutation]);
 
   const logout = useCallback(async () => {
