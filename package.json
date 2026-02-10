@@ -6,10 +6,13 @@
     "start": "bunx rork start -p kuvai35km5xoz2u7la5xv --tunnel",
     "start-web": "bunx rork start -p kuvai35km5xoz2u7la5xv --web --tunnel",
     "start-web-dev": "DEBUG=expo* bunx rork start -p kuvai35km5xoz2u7la5xv --web --tunnel",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "backend": "bun run backend/server.ts",
+    "backend:node": "npx tsx backend/server.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
+    "@hono/node-server": "^1.19.9",
     "@hono/trpc-server": "^0.4.2",
     "@lottiefiles/dotlottie-react": "^0.17.14",
     "@nkzw/create-context-hook": "^1.1.0",
@@ -61,6 +64,7 @@
     "@types/react": "~19.1.10",
     "eslint": "^9.31.0",
     "eslint-config-expo": "~10.0.0",
+    "tsx": "^4.21.0",
     "typescript": "~5.9.2"
   },
   "private": true

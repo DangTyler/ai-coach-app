@@ -22,7 +22,7 @@ const getBaseUrl = () => {
 export const trpcClient = trpc.createClient({
   links: [
     httpLink({
-      url: `${getBaseUrl()}/api/trpc`,
+      url: `${getBaseUrl()}/trpc`,
       transformer: superjson,
       headers() {
         const token = getAuthToken();
@@ -32,6 +32,7 @@ export const trpcClient = trpc.createClient({
         return {};
       },
       async fetch(url, options) {
+        const baseUrl = getBaseUrl();
         let response: Response;
         try {
           response = await fetch(url, options);
@@ -39,6 +40,13 @@ export const trpcClient = trpc.createClient({
           console.log("[tRPC] Network error:", err);
           throw new Error(
             "Unable to connect to the server. Please check your internet connection and try again."
+          );
+        }
+        const contentType = response.headers.get("content-type") || "";
+        if (contentType.includes("text/html")) {
+          console.log("[tRPC] Backend returned HTML instead of JSON. Is the correct server running?", url);
+          throw new Error(
+            `Backend returned a web page instead of data. Make sure your backend is running (npm run backend:node) at ${baseUrl} and nothing else is using that port.`
           );
         }
         if (response.status === 429) {
@@ -51,7 +59,6 @@ export const trpcClient = trpc.createClient({
           );
         }
         if (!response.ok) {
-          const contentType = response.headers.get("content-type") || "";
           if (!contentType.includes("application/json")) {
             console.log("[tRPC] Non-JSON response, status:", response.status);
             throw new Error(
