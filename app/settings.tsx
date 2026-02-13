@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight, User, Sparkles, LogOut, Mail } from "lucide-react-native";
+import { ChevronLeft, Moon, Sun, RotateCcw, ChevronRight, User, Sparkles, LogOut, Mail, Crown, CreditCard, Zap } from "lucide-react-native";
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -16,6 +16,8 @@ import * as Haptics from 'expo-haptics';
 
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCreditsContext } from "@/contexts/CreditsContext";
+import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { onboardingStorage } from "@/app/onboarding/storage";
 
 export default function SettingsScreen() {
@@ -27,6 +29,14 @@ export default function SettingsScreen() {
   const [editingGoals, setEditingGoals] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const { user, logout, isAuthenticated } = useAuth();
+  const { credits, nextDailyRefillAt, error: creditsError, isLoading: creditsLoading } = useCreditsContext();
+  const {
+    isPro,
+    isLoading: isSubLoading,
+    error: subError,
+    presentPaywall,
+    presentCustomerCenter,
+  } = useRevenueCat();
 
   useEffect(() => {
     loadUserContext();
@@ -227,6 +237,110 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Credits</Text>
+          <View style={styles.card}>
+            {creditsError ? (
+              <View style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: "#EF4444", flex: 1 }]}>
+                  Couldn't load credits. Pull down to retry.
+                </Text>
+                <Text style={[styles.settingDescription, { color: "#EF4444", marginTop: 4 }]}>{creditsError}</Text>
+              </View>
+            ) : (
+              <View style={styles.settingRow}>
+                <View style={styles.settingLeft}>
+                  <View style={[styles.iconContainer, { backgroundColor: Colors.accentLight }]}>
+                    <Zap color={Colors.accent} size={20} />
+                  </View>
+                  <View style={styles.settingTextContainer}>
+                    <Text style={styles.settingLabel}>Balance</Text>
+                    <Text style={styles.settingDescription}>
+                      {creditsLoading ? "Loading…" : `${credits} credits • 1 per message. Daily refill: 5 credits`}
+                      {!creditsLoading && nextDailyRefillAt != null
+                        ? ` • Next refill ${new Date(nextDailyRefillAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+                        : ""}
+                    </Text>
+                  </View>
+                </View>
+                {!creditsLoading && <Text style={styles.creditsBalance}>{credits}</Text>}
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Subscription</Text>
+          <View style={styles.card}>
+            {subError ? (
+              <View style={styles.settingRow}>
+                <Text style={[styles.settingLabel, { color: '#EF4444' }]}>{subError}</Text>
+              </View>
+            ) : null}
+            {!isSubLoading && (
+              <>
+                {isPro ? (
+                  <View style={[styles.settingRow, { paddingVertical: 12 }]}>
+                    <View style={styles.settingLeft}>
+                      <View style={[styles.iconContainer, { backgroundColor: '#E8F5E9' }]}>
+                        <Crown color="#2E7D32" size={20} />
+                      </View>
+                      <View style={styles.settingTextContainer}>
+                        <Text style={styles.settingLabel}>AI Coach App Pro</Text>
+                        <Text style={styles.settingDescription}>You have full access</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.settingRow}
+                    onPress={async () => {
+                      await presentPaywall();
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.settingLeft}>
+                      <View style={[styles.iconContainer, { backgroundColor: Colors.accentLight }]}>
+                        <Crown color={Colors.accent} size={20} />
+                      </View>
+                      <View style={styles.settingTextContainer}>
+                        <Text style={styles.settingLabel}>Upgrade to Pro</Text>
+                        <Text style={styles.settingDescription}>
+                          Monthly, yearly, or lifetime — unlock all coaches
+                        </Text>
+                      </View>
+                    </View>
+                    <ChevronRight color={Colors.textMuted} size={20} />
+                  </TouchableOpacity>
+                )}
+                <View style={styles.divider} />
+                <TouchableOpacity
+                  style={styles.settingRow}
+                  onPress={async () => {
+                    await presentCustomerCenter();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.settingLeft}>
+                    <View style={[styles.iconContainer, { backgroundColor: Colors.cardAlt }]}>
+                      <CreditCard color={Colors.navy} size={20} />
+                    </View>
+                    <View style={styles.settingTextContainer}>
+                      <Text style={styles.settingLabel}>Manage subscription</Text>
+                      <Text style={styles.settingDescription}>
+                        Restore purchases, cancel, or change plan
+                      </Text>
+                    </View>
+                  </View>
+                  <ChevronRight color={Colors.textMuted} size={20} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+
         {isAuthenticated && user && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Account</Text>
@@ -396,6 +510,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  creditsBalance: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.navy,
   },
   infoRow: {
     flexDirection: "row",

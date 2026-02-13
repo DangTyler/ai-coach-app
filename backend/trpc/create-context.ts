@@ -10,7 +10,7 @@ export const createContext = async (opts: FetchCreateContextFnOptions) => {
 
   let user: { id: string; email: string; name: string } | null = null;
   if (token) {
-    user = getUserFromToken(token);
+    user = await getUserFromToken(token);
   }
 
   return {

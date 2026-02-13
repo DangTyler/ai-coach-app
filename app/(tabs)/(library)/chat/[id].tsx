@@ -29,6 +29,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useChats } from "@/contexts/ChatContext";
 import { useCoaches } from "@/contexts/CoachContext";
+import { useCreditsContext } from "@/contexts/CreditsContext";
+import { useRevenueCat } from "@/contexts/RevenueCatContext";
 import { defaultContextCards, ContextCard } from "@/mocks/chats";
 import { onboardingStorage, UserContext } from "@/app/onboarding/storage";
 import { voiceSettingsStorage } from "@/store/voiceSettings";
@@ -54,6 +56,8 @@ export default function ChatScreen() {
   const { getCoachById } = useCoaches();
   const coach = getCoachById(id || "");
   const { getOrCreateChat, addMessage, getMessages } = useChats();
+  const { credits, useCredit } = useCreditsContext();
+  const { presentPaywall } = useRevenueCat();
   
   const [activeChatId, setActiveChatId] = useState<string | null>(chatId || null);
   const [inputText, setInputText] = useState("");
@@ -319,8 +323,21 @@ Personality & Approach:
   }, [systemPrompt, coach, isSystemInitialized, setMessages, activeChatId, getMessages]);
 
   const handleSendMessage = useCallback(
-    (text: string) => {
+    async (text: string) => {
       if (!text.trim() || !coach || isLoading) return;
+
+      const result = await useCredit(1);
+      if (!result.success) {
+        Alert.alert(
+          "Out of credits",
+          "Get more credits with a subscription or wait for your daily refill.",
+          [
+            { text: "OK" },
+            { text: "Get more", onPress: () => presentPaywall() },
+          ]
+        );
+        return;
+      }
 
       let currentChatId = activeChatId;
       if (!currentChatId) {
@@ -331,7 +348,7 @@ Personality & Approach:
       sendAgentMessage(text.trim());
       setInputText("");
     },
-    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading]
+    [coach, activeChatId, getOrCreateChat, sendAgentMessage, isLoading, useCredit, presentPaywall]
   );
 
   useEffect(() => {
@@ -705,17 +722,27 @@ Personality & Approach:
         options={{
           title: coach.name,
           headerRight: () => (
-            <TouchableOpacity
-              onPress={openSheet}
-              style={styles.headerContextButton}
-            >
-              <SlidersHorizontal color={Colors.navy} size={20} />
-              {enabledCount > 0 && (
-                <View style={styles.contextBadge}>
-                  <Text style={styles.contextBadgeText}>{enabledCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <View style={styles.headerRightRow}>
+              <TouchableOpacity
+                onPress={() => presentPaywall()}
+                style={styles.creditsPill}
+                activeOpacity={0.7}
+              >
+                <Zap color={Colors.accent} size={14} />
+                <Text style={styles.creditsPillText}>{credits}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={openSheet}
+                style={styles.headerContextButton}
+              >
+                <SlidersHorizontal color={Colors.navy} size={20} />
+                {enabledCount > 0 && (
+                  <View style={styles.contextBadge}>
+                    <Text style={styles.contextBadgeText}>{enabledCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
@@ -855,10 +882,10 @@ Personality & Approach:
           <TouchableOpacity
             style={[
               styles.sendButton,
-              inputText.trim() && !isLoading && { backgroundColor: coach.color },
+              inputText.trim() && !isLoading && credits > 0 && { backgroundColor: coach.color },
             ]}
             onPress={() => handleSendMessage(inputText)}
-            disabled={!inputText.trim() || isLoading || isRecording}
+            disabled={!inputText.trim() || isLoading || isRecording || credits <= 0}
             activeOpacity={0.8}
           >
             {isLoading ? (
@@ -983,6 +1010,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  headerRightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  creditsPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.accentLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  creditsPillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: Colors.navy,
   },
   headerContextButton: {
     flexDirection: "row",

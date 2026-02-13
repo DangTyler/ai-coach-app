@@ -53,10 +53,10 @@ export const authRouter = createTRPCRouter({
     return ctx.user;
   }),
 
-  logout: protectedProcedure.mutation(({ ctx }) => {
+  logout: protectedProcedure.mutation(async ({ ctx }) => {
     const token = ctx.token;
     if (token) {
-      invalidateToken(token);
+      await invalidateToken(token);
     }
     return { success: true };
   }),
@@ -67,9 +67,9 @@ export const authRouter = createTRPCRouter({
         name: z.string().min(1).optional(),
       })
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
-        return updateUserProfile(ctx.user.id, input);
+        return await updateUserProfile(ctx.user.id, input);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",

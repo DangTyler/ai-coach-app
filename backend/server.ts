@@ -7,7 +7,9 @@
  *
  * Serves the Hono app at /api/trpc for tRPC (auth, etc.) and GET / for health.
  * Set EXPO_PUBLIC_RORK_API_BASE_URL=http://localhost:3000 in the app .env to connect.
+ * For Supabase: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env or environment.
  */
+import "dotenv/config";
 import app from "./hono";
 
 const port = Number(process.env.PORT) || 3000;

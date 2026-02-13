@@ -10,6 +10,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ChatProvider } from "@/contexts/ChatContext";
 import { CoachProvider } from "@/contexts/CoachContext";
+import { CreditsProvider } from "@/contexts/CreditsContext";
+import { RevenueCatProvider } from "@/contexts/RevenueCatContext";
 import { onboardingStorage } from "@/app/onboarding/storage";
 
 SplashScreen.preventAutoHideAsync();
@@ -106,11 +108,15 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView>
           <AuthProvider>
-            <CoachProvider>
-              <ChatProvider>
-                <RootLayoutWithAuth />
-              </ChatProvider>
-            </CoachProvider>
+            <RevenueCatProvider>
+              <CreditsProvider>
+                <CoachProvider>
+                  <ChatProvider>
+                    <RootLayoutWithAuth />
+                  </ChatProvider>
+                </CoachProvider>
+              </CreditsProvider>
+            </RevenueCatProvider>
           </AuthProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
