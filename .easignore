@@ -1,0 +1,3 @@
+# Force EAS to use npm: exclude Bun lockfile so only package-lock.json is present
+bun.lock
+bun.lockb
